@@ -1,0 +1,19 @@
+# Archivos de configuración con contraseñas (NO SUBIR)
+config/conexion.php
+
+# Archivos temporales y logs
+*.log
+*.tmp
+
+# Archivos del sistema
+.DS_Store
+Thumbs.db
+
+# Backup de base de datos (cada quien tendrá su propia conexión)
+*.sql
+!/estructura-bd.sql
+
+# Archivos de sesión o caché
+session_*
+cache/
+tmp/
