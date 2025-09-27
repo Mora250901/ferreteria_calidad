@@ -12,7 +12,7 @@ if (!isset($_SESSION['autenticado']) || !isset($_SESSION['usuario_data'])) {
 }
 $u = $_SESSION['usuario_data'];
 if (!isset($u['rol']) || $u['rol'] !== 'logistico') {
-    header("Location: ../public/login.php"); // o index_home.php si es otro dashboard
+    header("Location: ../public/login.php");
     exit;
 }
 
@@ -183,13 +183,7 @@ body.oscuro .table-hover tbody tr:hover {
 </button>
 
 <!-- Sidebar -->
-<div class="sidebar <?= htmlspecialchars($tema_usuario) ?>" id="sidebar">
-    <h5 class="px-3 mb-3 text-muted">Administración</h5>
-    <a href="logistico_dashboard.php" class="active"><i class="fas fa-chart-line me-2"></i>Dashboard</a>
-    <a href="perfil.php"><i class="fas fa-user me-2"></i>Perfil</a>
-    <a href="configuraciones.php"><i class="fas fa-cog me-2"></i>Configuraciones</a>
-    <a href="productos.php"><i class="fas fa-box me-2"></i>Productos</a>
-</div>
+<?php include("../includes/sidevar.php"); ?>
 
 <!-- Contenido principal -->
 <div class="main-content">

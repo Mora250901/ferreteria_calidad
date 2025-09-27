@@ -4,44 +4,102 @@ require_once("../config/conexion.php");
 require_once("../config/tema.php");
 
 if (!isset($_SESSION['autenticado']) || !isset($_SESSION['usuario_data'])) {
-    header("Location: login.php");
+    header("Location: ../public/login.php");
+    exit;
+}
+$u = $_SESSION['usuario_data'];
+if (!isset($u['rol']) || $u['rol'] !== 'logistico') {
+    header("Location: ../public/login.php");
     exit;
 }
 
 function str($s){ return trim((string)$s); }
 function b($v){ return (int)!!$v; }
 
-/* FUNCIÓN: Obtener atributos por categoría */
-function obtenerAtributosPorCategoria($conn, $id_categoria) {
-    $atributos = [];
-    $sql = "SELECT a.id_atributo, a.nombre_atributo, a.tipo_atributo, ca.obligatorio
-            FROM categorias_atributos ca
-            INNER JOIN atributos a ON a.id_atributo = ca.id_atributo
-            WHERE ca.id_categoria = ?
-            ORDER BY ca.orden ASC";
-    $st = $conn->prepare($sql);
-    $st->bind_param("i", $id_categoria);
-    $st->execute();
-    $result = $st->get_result();
-    while($row = $result->fetch_assoc()) {
-        $atributos[] = $row;
-    }
-    return $atributos;
-}
-
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     header('Content-Type: application/json; charset=utf-8');
 
-    /* OBTENER atributos por categoría */
-    if ($_POST['action'] === 'get_atributos_categoria' && isset($_POST['id_categoria'])) {
+    if ($_POST['action'] === 'get_proveedores_categoria' && isset($_POST['id_categoria'])) {
         $id_categoria = (int)$_POST['id_categoria'];
-        $atributos = obtenerAtributosPorCategoria($conn, $id_categoria);
-        echo json_encode(['status'=>'ok', 'atributos'=>$atributos]);
+        $sql = "SELECT p.id_proveedor, p.nombre_proveedor
+                FROM proveedor_categoria pc
+                INNER JOIN proveedores p ON pc.id_proveedor = p.id_proveedor
+                WHERE pc.id_categoria = ? AND p.activo = 1
+                ORDER BY p.nombre_proveedor";
+        $st = $conn->prepare($sql);
+        $st->bind_param("i", $id_categoria);
+        $st->execute();
+        $proveedores = $st->get_result()->fetch_all(MYSQLI_ASSOC);
+        echo json_encode(['status'=>'ok', 'proveedores'=>$proveedores]);
         exit;
     }
 
-    /* LISTAR productos */
-    if ($_POST['action'] === 'list') {
+    if ($_POST['action'] === 'get_productos_catalogo' && isset($_POST['id_proveedor']) && isset($_POST['id_categoria'])) {
+        $id_proveedor = (int)$_POST['id_proveedor'];
+        $id_categoria = (int)$_POST['id_categoria'];
+        
+        $sql = "SELECT cp.id_catalogo, cp.nombre_producto, cp.marca, cp.precio_compra
+                FROM catalogo_proveedor cp
+                WHERE cp.id_proveedor = ? AND cp.id_categoria = ? AND cp.activo = 1
+                ORDER BY cp.nombre_producto";
+        $st = $conn->prepare($sql);
+        $st->bind_param("ii", $id_proveedor, $id_categoria);
+        $st->execute();
+        $productos = $st->get_result()->fetch_all(MYSQLI_ASSOC);
+        echo json_encode(['status'=>'ok', 'productos'=>$productos]);
+        exit;
+    }
+    if ($_POST['action'] === 'get_atributos_producto' && isset($_POST['id_catalogo'])) {
+        $id_catalogo = (int)$_POST['id_catalogo'];
+        
+        $sqlProducto = "SELECT cp.*, c.nombre_categoria, a.nombre_atributo, 
+                               GROUP_CONCAT(DISTINCT 
+                                   CASE 
+                                       WHEN cpa.valor_texto IS NOT NULL THEN cpa.valor_texto
+                                       WHEN cpa.valor_numero IS NOT NULL THEN cpa.valor_numero
+                                       WHEN cpa.valor_decimal IS NOT NULL THEN cpa.valor_decimal
+                                       WHEN cpa.valor_booleano IS NOT NULL THEN cpa.valor_booleano
+                                       WHEN cpa.valor_fecha IS NOT NULL THEN cpa.valor_fecha
+                                   END
+                               ) as valores
+                        FROM catalogo_proveedor cp
+                        INNER JOIN categorias c ON cp.id_categoria = c.id_categoria
+                        LEFT JOIN catalogo_proveedor_atributos cpa ON cp.id_catalogo = cpa.id_catalogo
+                        LEFT JOIN atributos a ON cpa.id_atributo = a.id_atributo
+                        WHERE cp.id_catalogo = ?
+                        GROUP BY a.id_atributo
+                        ORDER BY a.nombre_atributo";
+        $st = $conn->prepare($sqlProducto);
+        $st->bind_param("i", $id_catalogo);
+        $st->execute();
+        $result = $st->get_result();
+        
+        $producto = null;
+        $atributos = [];
+        
+        while($row = $result->fetch_assoc()) {
+            if (!$producto) {
+                $producto = [
+                    'id_catalogo' => $row['id_catalogo'],
+                    'nombre_producto' => $row['nombre_producto'],
+                    'marca' => $row['marca'],
+                    'precio_compra' => $row['precio_compra'],
+                    'categoria' => $row['nombre_categoria']
+                ];
+            }
+            
+            if ($row['nombre_atributo'] && $row['valores']) {
+                $atributos[] = [
+                    'nombre' => $row['nombre_atributo'],
+                    'valores' => explode(',', $row['valores'])
+                ];
+            }
+        }
+        
+        echo json_encode(['status'=>'ok', 'producto'=>$producto, 'atributos'=>$atributos]);
+        exit;
+    }
+     if ($_POST['action'] === 'list') {
         $sql = "SELECT p.id_producto, p.nombre_producto AS nombre, p.descripcion, p.sku, p.precio AS precio_venta, 
                        p.stock, 5 AS stock_minimo, p.id_categoria, NULL AS id_proveedor_principal, 
                        p.imagen_principal, p.fecha_creacion, p.activo,
@@ -63,8 +121,90 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         exit;
     }
 
-    /* OBTENER un producto */
-    if ($_POST['action'] === 'get' && isset($_POST['id'])) {
+    if ($_POST['action'] === 'create') {
+        $id_catalogo = (int)($_POST['id_catalogo'] ?? 0);
+        $precio = max(0, floatval($_POST['precio_venta'] ?? 0));
+        $stock = max(0, intval($_POST['stock'] ?? 0));
+        $sku = str($_POST['sku'] ?? '');
+        $activo = isset($_POST['activo']) ? b($_POST['activo']) : 1;
+        
+        $sqlCatalogo = "SELECT cp.nombre_producto, cp.marca, cp.id_categoria, cp.id_proveedor 
+                       FROM catalogo_proveedor cp WHERE cp.id_catalogo = ?";
+        $stCatalogo = $conn->prepare($sqlCatalogo);
+        $stCatalogo->bind_param("i", $id_catalogo);
+        $stCatalogo->execute();
+        $productoCatalogo = $stCatalogo->get_result()->fetch_assoc();
+        
+        if (!$productoCatalogo) {
+            echo json_encode(['status'=>'error','message'=>'Producto del catálogo no encontrado']);
+            exit;
+        }
+        
+        $nombre = $productoCatalogo['nombre_producto'];
+        $marca = $productoCatalogo['marca'];
+        $id_categoria = $productoCatalogo['id_categoria'];
+        $id_proveedor = $productoCatalogo['id_proveedor'];
+        
+        $rutaDB = null;
+        if (!empty($_FILES['imagen_principal']['name'])) {
+            $nombreArchivo = uniqid() . "." . pathinfo($_FILES["imagen_principal"]["name"], PATHINFO_EXTENSION);
+            $categoriaDir = "assets/img/productos";
+            $targetDir = dirname(__DIR__). "/$categoriaDir";
+            
+            if (!is_dir($targetDir)) mkdir($targetDir, 0777, true);
+            
+            $rutaDestino = $targetDir . "/" . $nombreArchivo;
+            if (move_uploaded_file($_FILES["imagen_principal"]["tmp_name"], $rutaDestino)) {
+                $rutaDB = "$categoriaDir/$nombreArchivo";
+            }
+        }
+         
+        $conn->begin_transaction();
+        try {
+            $sql = "INSERT INTO productos (nombre_producto, descripcion, precio, stock, sku, id_categoria, activo, imagen_principal)
+                    VALUES (?, '', ?, ?, ?, ?, ?, ?)";
+            $st = $conn->prepare($sql);
+            $st->bind_param("sdisiis", $nombre, $precio, $stock, $sku, $id_categoria, $activo, $rutaDB);
+            $st->execute();
+            $id_producto = $conn->insert_id;
+            
+            $sqlProv = "INSERT INTO producto_proveedor (id_producto, id_proveedor, precio_compra) 
+                       VALUES (?, ?, ?)";
+            $stProv = $conn->prepare($sqlProv);
+            $precio_compra = floatval($_POST['precio_compra'] ?? 0);
+            $stProv->bind_param("iid", $id_producto, $id_proveedor, $precio_compra);
+            $stProv->execute();
+            
+            if (isset($_POST['atributos']) && is_array($_POST['atributos'])) {
+                foreach ($_POST['atributos'] as $nombre_atributo => $valor_seleccionado) {
+                    $sqlAttr = "SELECT id_atributo FROM atributos WHERE nombre_atributo = ?";
+                    $stAttr = $conn->prepare($sqlAttr);
+                    $stAttr->bind_param("s", $nombre_atributo);
+                    $stAttr->execute();
+                    $attrResult = $stAttr->get_result();
+                    
+                    if ($attrResult->num_rows > 0) {
+                        $id_atributo = $attrResult->fetch_assoc()['id_atributo'];
+                        
+                        $sqlInsertAttr = "INSERT INTO productos_atributos (id_producto, id_atributo, valor_texto) 
+                                        VALUES (?, ?, ?)";
+                        $stInsertAttr = $conn->prepare($sqlInsertAttr);
+                        $stInsertAttr->bind_param("iis", $id_producto, $id_atributo, $valor_seleccionado);
+                        $stInsertAttr->execute();
+                    }
+                }
+            }
+            
+            $conn->commit();
+            echo json_encode(['status'=>'ok','message'=>'Producto creado correctamente con selección de atributos']);
+            
+        } catch (Exception $e) {
+            $conn->rollback();
+            echo json_encode(['status'=>'error','message'=>'Error al crear producto: ' . $e->getMessage()]);
+        }
+        exit;
+    }
+     if ($_POST['action'] === 'get' && isset($_POST['id'])) {
         $id = (int)$_POST['id'];
         $sql = "SELECT p.*, c.nombre_categoria AS categoria_nombre, NULL AS proveedor_principal_nombre
                 FROM productos p
@@ -76,7 +216,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         $prod = $st->get_result()->fetch_assoc();
         if (!$prod) { echo json_encode(['status'=>'error','message'=>'No encontrado']); exit; }
 
-        // Proveedores relacionados
         $prov = [];
         $sqlProv = "SELECT pp.id_relacion, pv.id_proveedor, pv.nombre_proveedor AS nombre, pv.telefono, pv.email,
                            pp.precio_compra, pp.tiempo_entrega, pp.codigo_proveedor
@@ -89,7 +228,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         $r2 = $st2->get_result();
         while($x = $r2->fetch_assoc()) $prov[] = $x;
 
-        // Atributos - usando productos_atributos
         $atrib = [];
         $sqlA = "SELECT pa.id_atributo, a.nombre_atributo AS clave, 
                         COALESCE(pa.valor_texto, pa.valor_numero, pa.valor_decimal, pa.valor_booleano, pa.valor_fecha) AS valor
@@ -103,7 +241,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         $r3 = $st3->get_result();
         while($x = $r3->fetch_assoc()) $atrib[] = $x;
 
-        // Variaciones + opciones
         $vari = [];
         $sqlV = "SELECT id_variacion, nombre_variacion AS nombre, NULL AS sku, NULL AS precio_extra, NULL AS stock, NULL AS imagen
                  FROM variaciones
@@ -119,7 +256,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $vari[] = $x;
             $variaciones_ids[] = (int)$x['id_variacion'];
         }
-
         if (!empty($variaciones_ids)) {
             $in = implode(',', array_fill(0, count($variaciones_ids), '?'));
             $types = str_repeat('i', count($variaciones_ids));
@@ -156,76 +292,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         exit;
     }
 
-    /* CREAR producto */
-    if ($_POST['action'] === 'create') {
-        $nombre   = str($_POST['nombre'] ?? '');
-        $descripcion = str($_POST['descripcion'] ?? '');
-        $precio = max(0, floatval($_POST['precio_venta'] ?? 0));
-        $stock    = max(0, intval($_POST['stock'] ?? 0));
-        $sku = str($_POST['sku'] ?? '');
-        $id_categoria = !empty($_POST['id_categoria']) ? (int)$_POST['id_categoria'] : null;
-        $activo = isset($_POST['activo']) ? b($_POST['activo']) : 1;
-
-        if ($nombre === '' || !$id_categoria) {
-            echo json_encode(['status'=>'error','message'=>'Nombre y Categoría son obligatorios']);
-            exit;
-        }
-
-        // Manejar imagen subida
-        $rutaDB = null;
-        if (!empty($_FILES['imagen_principal']['name'])) {
-            $nombreArchivo = uniqid() . "." . pathinfo($_FILES["imagen_principal"]["name"], PATHINFO_EXTENSION);
-            $categoriaDir  = "assets/img/productos";   // ruta relativa para BD
-            $targetDir     = dirname(__DIR__). "/$categoriaDir";                // ruta absoluta en servidor
-
-            if (!is_dir($targetDir)) mkdir($targetDir, 0777, true);
-
-            $rutaDestino = $targetDir . "/" . $nombreArchivo;
-            if (move_uploaded_file($_FILES["imagen_principal"]["tmp_name"], $rutaDestino)) {
-                $rutaDB = "$categoriaDir/$nombreArchivo";
-            }
-        }
-
-        // Insert con imagen
-        $sql = "INSERT INTO productos (nombre_producto, descripcion, precio, stock, sku, id_categoria, activo, imagen_principal)
-                VALUES (?,?,?,?,?,?,?,?)";
-        $st = $conn->prepare($sql);
-        $st->bind_param("ssdisiis", $nombre, $descripcion, $precio, $stock, $sku, $id_categoria, $activo, $rutaDB);
-        $ok = $st->execute();
-        
-        $id_producto = $conn->insert_id;
-        $message = 'Producto creado correctamente';
-        
-        // Guardar atributos si existen
-        if ($ok && isset($_POST['atributos']) && is_array($_POST['atributos'])) {
-            foreach ($_POST['atributos'] as $id_atributo => $valor) {
-                if (!empty($valor)) {
-                    // Determinar el tipo de valor basado en el tipo de atributo
-                    $sqlTipo = "SELECT tipo_atributo FROM atributos WHERE id_atributo = ?";
-                    $stTipo = $conn->prepare($sqlTipo);
-                    $stTipo->bind_param("i", $id_atributo);
-                    $stTipo->execute();
-                    $tipoResult = $stTipo->get_result();
-                    if ($tipoResult->num_rows > 0) {
-                        $tipo = $tipoResult->fetch_assoc()['tipo_atributo'];
-                        
-                        $campoValor = "valor_" . $tipo;
-                        $sqlAtributo = "INSERT INTO productos_atributos (id_producto, id_atributo, $campoValor) 
-                                       VALUES (?, ?, ?)";
-                        $stAtributo = $conn->prepare($sqlAtributo);
-                        $stAtributo->bind_param("iis", $id_producto, $id_atributo, $valor);
-                        $stAtributo->execute();
-                    }
-                }
-            }
-            $message .= ' con atributos';
-        }
-        
-        echo json_encode(['status'=>$ok?'ok':'error','message'=>$ok?$message:'Error al crear el producto']);
-        exit;
-    }
-
-    /* ACTUALIZAR producto */
     if ($_POST['action'] === 'update' && isset($_POST['id_producto'])) {
         $id_producto = (int)$_POST['id_producto'];
         $nombre      = str($_POST['nombre'] ?? '');
@@ -241,7 +307,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             exit;
         }
 
-        // Obtener ruta actual de la imagen
         $sqlImg = "SELECT imagen_principal FROM productos WHERE id_producto=?";
         $stImg = $conn->prepare($sqlImg);
         $stImg->bind_param("i", $id_producto);
@@ -252,24 +317,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 
         $rutaDB = $rutaActual;
 
-        // Si el usuario marcó eliminar imagen
         if (!empty($_POST['eliminar_imagen'])) {
             if ($rutaActual && file_exists(dirname(__DIR__) . "/" . $rutaActual)) {
                 unlink(dirname(__DIR__) . "/" . $rutaActual);
             }
             $rutaDB = null;
         }
-
-        // Si subió una nueva imagen
-        if (!empty($_FILES['imagen_principal']['name'])) {
-            // Borrar imagen anterior si existe
+                if (!empty($_FILES['imagen_principal']['name'])) {
             if ($rutaActual && file_exists(dirname(__DIR__) . "/" . $rutaActual)) {
                 unlink(dirname(__DIR__) . "/" . $rutaActual);
             }
 
             $nombreArchivo = uniqid() . "." . pathinfo($_FILES["imagen_principal"]["name"], PATHINFO_EXTENSION);
-            $categoriaDir  = "assets/img/productos";   // ruta relativa para BD
-            $targetDir     = dirname(__DIR__) . "/$categoriaDir";       // ruta absoluta en servidor
+            $categoriaDir  = "assets/img/productos";
+            $targetDir     = dirname(__DIR__) . "/$categoriaDir";
 
             if (!is_dir($targetDir)) {
                 mkdir($targetDir, 0777, true);
@@ -277,11 +338,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 
             $rutaDestino = $targetDir . "/" . $nombreArchivo;
             if (move_uploaded_file($_FILES["imagen_principal"]["tmp_name"], $rutaDestino)) {
-                $rutaDB = "$categoriaDir/$nombreArchivo"; // lo que guardarás en la BD
+                $rutaDB = "$categoriaDir/$nombreArchivo";
             }
         }
 
-        // Actualizar datos del producto
         $sql = "UPDATE productos 
                 SET nombre_producto=?, descripcion=?, precio=?, stock=?, sku=?, id_categoria=?, activo=?, imagen_principal=?
                 WHERE id_producto=?";
@@ -296,7 +356,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         exit;
     }
 
-    /* ELIMINAR producto */
     if ($_POST['action']==='delete' && isset($_POST['id'])) {
         $id = (int)$_POST['id'];
         $st = $conn->prepare("DELETE FROM productos WHERE id_producto=?");
@@ -310,25 +369,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     exit;
 }
 
-/* selects para categorías/proveedores */
-$categorias=[]; $proveedores=[];
-if($rc=$conn->query("SELECT id_categoria,nombre_categoria FROM categorias ORDER BY nombre_categoria ASC"))
-    while($r=$rc->fetch_assoc()) $categorias[]=$r;
-if($rp=$conn->query("SELECT id_proveedor,nombre_proveedor FROM proveedores WHERE activo=1 ORDER BY nombre_proveedor ASC"))
-    while($r=$rp->fetch_assoc()) $proveedores[]=$r;
+$categorias = [];
+if($rc = $conn->query("SELECT id_categoria, nombre_categoria FROM categorias ORDER BY nombre_categoria ASC")) {
+    while($r = $rc->fetch_assoc()) $categorias[] = $r;
+}
 ?>
 <!doctype html>
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<title>Productos</title>
+<title>Productos - Nuevo Sistema</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
 <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
 <link href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css" rel="stylesheet">
-<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
-<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
 
 <style>
 body.claro { background:#f8f9fa; color:#212529; }
@@ -344,16 +399,19 @@ body.oscuro { background:#212529; color:#f8f9fa; }
 .toggle-btn{ position:fixed; top:10px; left:10px; z-index:1100;}
 .card{ border-radius:12px; }
 body.oscuro .card{ background:#2c3034; color:#f8f9fa; }
-.table-img{ width:48px; height:48px; object-fit:cover; border-radius:6px; border:1px solid rgba(0,0,0,.08);}
+.table-img{ width:48px; height:48px; object-fit:cover; border-radius:6px; }
 .badge-status{ font-size:.85rem; }
-.codebox{ white-space:pre-wrap; background:rgba(0,0,0,.05); padding:12px; border-radius:8px; }
-body.oscuro .codebox{ background:#1f2327; }
-#modalCrear .modal-body {max-height: 70vh; overflow-y: auto;}
+.atributo-spinner { border: 2px solid #e9ecef; border-radius: 8px; padding: 15px; margin-bottom: 15px; background: #f8f9fa; }
+.atributo-spinner h6 { color: #495057; margin-bottom: 10px; }
+.paso { display: none; }
+.paso.activo { display: block; }
+.paso-header { background: #e9ecef; padding: 10px 15px; border-radius: 6px; margin-bottom: 20px; }
+body.oscuro .atributo-spinner { background: #2c3034; border-color: #495057; }
+body.oscuro .paso-header { background: #343a40; }
 .modal-dialog-scrollable .modal-body {
-  max-height: calc(100vh - 200px); /* ajusta el 200px según tu header/footer */
+  max-height: 70vh;
   overflow-y: auto;
 }
-
 </style>
 </head>
 <body class="<?= htmlspecialchars($tema_usuario) ?>">
@@ -362,22 +420,15 @@ body.oscuro .codebox{ background:#1f2327; }
   <i class="fas fa-bars"></i>
 </button>
 
-<div class="sidebar <?= htmlspecialchars($tema_usuario) ?>" id="sidebar">
-  <h5 class="px-3 mb-3 text-muted">Administración</h5>
-  <a href="logistico_dashboard.php"><i class="fas fa-chart-line me-2"></i>Dashboard</a>
-  <a href="perfil.php"><i class="fas fa-user me-2"></i>Perfil</a>
-  <a href="configuraciones.php"><i class="fas fa-cog me-2"></i>Configuraciones</a>
-  <a class="active" href="productos.php"><i class="fas fa-box me-2"></i>Productos</a>
-  <a href="logout.php" class="text-danger"><i class="fas fa-sign-out-alt me-2"></i>Cerrar sesión</a>
-</div>
+<?php include("../includes/sidevar.php"); ?>
 
 <div class="main-content">
 <div class="container my-4">
 
   <div class="d-flex align-items-center justify-content-between mb-3">
     <div>
-      <h2 class="mb-0">Productos</h2>
-      <div class="text-muted">Gestiona tu catálogo</div>
+      <h2 class="mb-0">Productos - Nuevo Sistema</h2>
+      <div class="text-muted">Selecciona productos del catálogo de proveedores</div>
     </div>
     <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalCrear">
       <i class="fa fa-plus me-2"></i>Nuevo producto
@@ -395,118 +446,154 @@ body.oscuro .codebox{ background:#1f2327; }
             <th>Imagen</th>
             <th>Nombre</th>
             <th>Categoría</th>
-            <th>Proveedor principal</th>
+            <th>Proveedor</th>
             <th>Precio</th>
             <th>Stock</th>
             <th>Activo</th>
-            <th>A/V</th>
+            <th>Atributos</th>
             <th class="text-end">Acciones</th>
           </tr>
         </thead>
-        <tbody><!-- AJAX --></tbody>
+        <tbody></tbody>
       </table>
     </div>
   </div>
 
 </div>
 </div>
-
-<!-- Modal CREAR -->
 <div class="modal fade" id="modalCrear" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-lg modal-dialog-scrollable">
     <div class="modal-content">
-      <form id="formCrear">
+      <form id="formCrear" enctype="multipart/form-data">
         <div class="modal-header">
-          <h5 class="modal-title">Nuevo producto - <span id="pasoActual">Paso 1: Categoría</span></h5>
+          <h5 class="modal-title">Nuevo Producto - <span id="pasoActual">Paso 1: Categoría</span></h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
         </div>
         <div class="modal-body">
           <div id="alertCrear"></div>
           
-          <!-- Paso 1: Selección de categoría -->
-          <div id="paso1">
-            <div class="mb-4">
-              <h6 class="mb-3">Selecciona la categoría del producto</h6>
+          <div class="paso activo" id="paso1">
+            <div class="paso-header">
+              <h6 class="mb-0"><i class="fas fa-layer-group me-2"></i>Paso 1: Selecciona la categoría</h6>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Categoría del producto *</label>
               <select name="id_categoria" id="selectCategoria" class="form-select" required>
                 <option value="">Selecciona una categoría...</option>
                 <?php foreach($categorias as $c): ?>
                   <option value="<?= (int)$c['id_categoria'] ?>"><?= htmlspecialchars($c['nombre_categoria']) ?></option>
                 <?php endforeach; ?>
               </select>
-              <div class="form-text">Los campos requeridos variarán según la categoría seleccionada.</div>
             </div>
-            <div class="text-center">
-              <button type="button" class="btn btn-primary" id="btnSiguiente">Siguiente <i class="fas fa-arrow-right ms-2"></i></button>
+            <div class="text-end">
+              <button type="button" class="btn btn-primary" id="btnSiguiente1">Siguiente <i class="fas fa-arrow-right ms-2"></i></button>
             </div>
           </div>
 
-          <!-- Paso 2: Datos del producto y atributos -->
-          <div id="paso2" style="display: none;">
-            <div class="d-flex align-items-center mb-3">
-              <button type="button" class="btn btn-sm btn-outline-secondary me-2" id="btnAtras">
-                <i class="fas fa-arrow-left"></i> Atrás
-              </button>
-              <span class="text-muted" id="categoriaSeleccionada"></span>
+          <div class="paso" id="paso2">
+            <div class="paso-header">
+              <h6 class="mb-0"><i class="fas fa-truck me-2"></i>Paso 2: Selecciona el proveedor</h6>
+              <small id="categoriaSeleccionada" class="text-muted"></small>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Proveedor *</label>
+              <select name="id_proveedor" id="selectProveedor" class="form-select" required>
+                <option value="">Cargando proveedores...</option>
+              </select>
+            </div>
+            <div class="d-flex justify-content-between">
+              <button type="button" class="btn btn-secondary" id="btnAtras2"><i class="fas fa-arrow-left me-2"></i> Atrás</button>
+              <button type="button" class="btn btn-primary" id="btnSiguiente2">Siguiente <i class="fas fa-arrow-right ms-2"></i></button>
+            </div>
+          </div>
+
+          <div class="paso" id="paso3">
+            <div class="paso-header">
+              <h6 class="mb-0"><i class="fas fa-box me-2"></i>Paso 3: Selecciona el producto</h6>
+              <small id="proveedorSeleccionado" class="text-muted"></small>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Producto del catálogo *</label>
+              <select name="id_catalogo" id="selectProductoCatalogo" class="form-select" required>
+                <option value="">Cargando productos...</option>
+              </select>
+            </div>
+            <div class="d-flex justify-content-between">
+              <button type="button" class="btn btn-secondary" id="btnAtras3"><i class="fas fa-arrow-left me-2"></i> Atrás</button>
+              <button type="button" class="btn btn-primary" id="btnSiguiente3">Siguiente <i class="fas fa-arrow-right ms-2"></i></button>
+            </div>
+          </div>
+
+          <div class="paso" id="paso4">
+            <div class="paso-header">
+              <h6 class="mb-0"><i class="fas fa-sliders-h me-2"></i>Paso 4: Configura los atributos</h6>
+              <small id="productoSeleccionado" class="text-muted"></small>
+            </div>
+            
+            <div class="card mb-4" id="infoProducto" style="display: none;">
+              <div class="card-body">
+                <h6 id="nombreProducto"></h6>
+                <p class="mb-1" id="marcaProducto"></p>
+                <p class="mb-0 text-muted" id="precioCompraProducto"></p>
+              </div>
             </div>
 
+            <div id="spinnersAtributos">
+              <div class="alert alert-info">
+                Selecciona un producto para ver sus atributos disponibles.
+              </div>
+            </div>
+
+            <div class="d-flex justify-content-between">
+              <button type="button" class="btn btn-secondary" id="btnAtras4"><i class="fas fa-arrow-left me-2"></i> Atrás</button>
+              <button type="button" class="btn btn-primary" id="btnSiguiente4">Siguiente <i class="fas fa-arrow-right ms-2"></i></button>
+            </div>
+          </div>
+                    <div class="paso" id="paso5">
+            <div class="paso-header">
+              <h6 class="mb-0"><i class="fas fa-info-circle me-2"></i>Paso 5: Información final</h6>
+            </div>
+            
             <div class="row g-3">
               <div class="col-md-6">
-                <label class="form-label">Nombre *</label>
-                <input type="text" name="nombre" class="form-control" required>
+                <label class="form-label">Precio de venta *</label>
+                <input type="number" step="0.01" name="precio_venta" class="form-control" required value="0">
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">Stock *</label>
+                <input type="number" name="stock" class="form-control" required value="0">
               </div>
               <div class="col-md-6">
                 <label class="form-label">SKU</label>
-                <input type="text" name="sku" class="form-control" placeholder="Código único">
-              </div>
-              <div class="col-md-4">
-                <label class="form-label">Precio</label>
-                <input type="number" step="0.01" name="precio_venta" class="form-control" value="0">
-              </div>
-              <div class="col-md-4">
-                <label class="form-label">Stock</label>
-                <input type="number" name="stock" class="form-control" value="0">
-              </div>
-              <div class="col-md-4">
-                <label class="form-label">Activo</label>
-                <div class="form-check form-switch mt-2">
-                  <input class="form-check-input" type="checkbox" name="activo" checked>
-                </div>
-              </div>
-              <div class="col-12">
-                <label class="form-label">Descripción</label>
-                <textarea name="descripcion" class="form-control" rows="3"></textarea>
+                <input type="text" name="sku" class="form-control" placeholder="Código único del producto">
               </div>
               <div class="col-md-6">
                 <label class="form-label">Imagen del producto</label>
                 <input type="file" name="imagen_principal" class="form-control" accept="image/*">
               </div>
-            </div>
-
-            <!-- Sección de atributos dinámicos -->
-            <div class="mt-4" id="seccionAtributos">
-              <h6 class="mb-3">Atributos específicos</h6>
-              <div id="camposAtributos">
-                <div class="alert alert-info">
-                  Selecciona una categoría primero para ver los atributos requeridos.
+              <div class="col-12">
+                <div class="form-check form-switch">
+                  <input class="form-check-input" type="checkbox" name="activo" checked>
+                  <label class="form-check-label">Producto activo</label>
                 </div>
               </div>
             </div>
+
+            <div class="d-flex justify-content-between mt-4">
+              <button type="button" class="btn btn-secondary" id="btnAtras5"><i class="fas fa-arrow-left me-2"></i> Atrás</button>
+              <button type="submit" class="btn btn-success"><i class="fas fa-save me-2"></i> Guardar Producto</button>
+            </div>
           </div>
-        </div>
-        <div class="modal-footer" id="footerPaso2" style="display: none;">
-          <button class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-          <button class="btn btn-primary" type="submit">Guardar producto</button>
         </div>
       </form>
     </div>
   </div>
 </div>
 
-<!-- Modal EDITAR -->
 <div class="modal fade" id="modalEditar" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-lg modal-dialog-scrollable">
     <div class="modal-content">
-      <form id="formEditar">
+      <form id="formEditar" enctype="multipart/form-data">
         <input type="hidden" name="id_producto" id="edit_id">
         <div class="modal-header">
           <h5 class="modal-title">Editar producto</h5>
@@ -521,30 +608,25 @@ body.oscuro .codebox{ background:#1f2327; }
             </div>
             <div class="col-md-6">
               <label class="form-label">Imagen actual</label>
-              <div id="previewImagen">
-                <img src="<?= htmlspecialchars($producto['imagen_principal'] ?? 'assets/productos/no-image.png') ?>" 
-                    alt="Imagen del producto" class="img-thumbnail mb-2" style="max-width: 150px;">
-              </div>
-
+              <div id="previewImagen" class="mb-2"></div>
               <label class="form-label">Cambiar imagen</label>
-              <input type="file" name="imagen_nueva" class="form-control" accept="image/*">
-
+              <input type="file" name="imagen_principal" class="form-control" accept="image/*">
               <div class="form-check mt-2">
-                <input class="form-check-input" type="checkbox" name="borrar_imagen" value="1">
-                <label class="form-check-label">Eliminar imagen actual</label>
+                <input class="form-check-input" type="checkbox" name="eliminar_imagen" value="1" id="edit_eliminar_imagen">
+                <label class="form-check-label" for="edit_eliminar_imagen">Eliminar imagen actual</label>
               </div>
             </div>
             <div class="col-md-4">
-              <label class="form-label">Precio venta</label>
-              <input type="number" step="0.01" name="precio_venta" id="edit_precio" class="form-control">
+              <label class="form-label">Precio venta *</label>
+              <input type="number" step="0.01" name="precio_venta" id="edit_precio" class="form-control" required>
             </div>
             <div class="col-md-4">
-              <label class="form-label">Stock</label>
-              <input type="number" name="stock" id="edit_stock" class="form-control">
+              <label class="form-label">Stock *</label>
+              <input type="number" name="stock" id="edit_stock" class="form-control" required>
             </div>
             <div class="col-md-4">
-              <label class="form-label">Stock mínimo</label>
-              <input type="number" name="stock_minimo" id="edit_stock_min" class="form-control">
+              <label class="form-label">SKU</label>
+              <input type="text" name="sku" id="edit_sku" class="form-control">
             </div>
             <div class="col-md-6">
               <label class="form-label">Categoría *</label>
@@ -555,421 +637,506 @@ body.oscuro .codebox{ background:#1f2327; }
                 <?php endforeach; ?>
               </select>
             </div>
-            <div class="col-md-6">
-              <label class="form-label">Proveedor principal</label>
-              <select name="id_proveedor_principal" id="edit_proveedor" class="form-select">
-                <option value="">(Ninguno)</option>
-                <?php foreach($proveedores as $p): ?>
-                  <option value="<?= (int)$p['id_proveedor'] ?>"><?= htmlspecialchars($p['nombre']) ?></option>
-                <?php endforeach; ?>
-              </select>
-            </div>
             <div class="col-12">
               <label class="form-label">Descripción</label>
               <textarea name="descripcion" id="edit_desc" class="form-control" rows="3"></textarea>
             </div>
             <div class="col-12">
-              <div class="form-check">
+              <div class="form-check form-switch">
                 <input class="form-check-input" type="checkbox" name="activo" id="edit_activo">
-                <label class="form-check-label" for="edit_activo">Activo</label>
+                <label class="form-check-label">Activo</label>
               </div>
             </div>
           </div>
 
           <hr class="my-4">
-          <div>
-            <h6 class="mb-2">Proveedores relacionados (solo lectura)</h6>
-            <div id="box_proveedores" class="codebox small">(sin datos)</div>
-            <div class="form-text">Se administran desde la tabla <code>producto_proveedor</code>.</div>
-          </div>
-
-          <hr class="my-4">
           <div class="row">
             <div class="col-md-6">
-              <h6 class="mb-2">Atributos</h6>
-              <div id="box_atributos" class="codebox small">(sin datos)</div>
+              <h6 class="mb-2">Proveedores relacionados</h6>
+              <div id="box_proveedores" class="codebox small">(cargando...)</div>
             </div>
             <div class="col-md-6">
-              <h6 class="mb-2">Variaciones</h6>
-              <div id="box_variaciones" class="codebox small">(sin datos)</div>
+              <h6 class="mb-2">Atributos del producto</h6>
+              <div id="box_atributos" class="codebox small">(cargando...)</div>
             </div>
           </div>
-
         </div>
         <div class="modal-footer">
-          <button class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
-          <button class="btn btn-primary" type="submit">Guardar cambios</button>
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Guardar cambios</button>
         </div>
       </form>
     </div>
   </div>
 </div>
-
-<!-- Modal VER Atributos/Variaciones -->
-<div class="modal fade" id="modalVerAV" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+<div class="modal fade" id="modalVerDetalles" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title">Atributos y Variaciones</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+        <h5 class="modal-title">Detalles del Producto</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body">
-        <h6 class="mb-2">Atributos</h6>
-        <div id="view_atributos" class="codebox small">(sin datos)</div>
-        <h6 class="mt-3 mb-2">Variaciones</h6>
-        <div id="view_variaciones" class="codebox small">(sin datos)</div>
+        <div class="row">
+          <div class="col-md-4 text-center">
+            <img id="view_imagen" src="../assets/img/productos/no-image.png" class="img-fluid rounded" 
+                 style="max-height: 200px;" onerror="this.src='../assets/img/productos/no-image.png'">
+          </div>
+          <div class="col-md-8">
+            <h4 id="view_nombre"></h4>
+            <p id="view_descripcion" class="text-muted"></p>
+            <div class="row">
+              <div class="col-6">
+                <strong>Precio:</strong> <span id="view_precio" class="text-success"></span>
+              </div>
+              <div class="col-6">
+                <strong>Stock:</strong> <span id="view_stock"></span>
+              </div>
+              <div class="col-6">
+                <strong>SKU:</strong> <span id="view_sku" class="text-muted"></span>
+              </div>
+              <div class="col-6">
+                <strong>Estado:</strong> <span id="view_estado" class="badge"></span>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <hr>
+        
+        <div class="row">
+          <div class="col-md-6">
+            <h6>Atributos</h6>
+            <div id="view_atributos_detalle" class="small"></div>
+          </div>
+          <div class="col-md-6">
+            <h6>Proveedores</h6>
+            <div id="view_proveedores_detalle" class="small"></div>
+          </div>
+        </div>
       </div>
       <div class="modal-footer">
-        <button class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
       </div>
     </div>
   </div>
 </div>
 
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+
 <script>
-// Variables globales
-let atributosCategoria = [];
-let categoriaActual = null;
+let productoSeleccionado = null;
+let atributosDisponibles = [];
 
 const tabla = $('#tablaProductos').DataTable({
-  language:{
-    search:"Buscar:", lengthMenu:"Mostrar _MENU_ registros", info:"Mostrando _START_ a _END_ de _TOTAL_",
-    infoEmpty:"Mostrando 0 a 0 de 0", emptyTable:"Sin datos", zeroRecords:"No se encontraron resultados",
-    paginate:{ next:"Siguiente", previous:"Anterior" }
+  language: {
+    search: "Buscar:", 
+    lengthMenu: "Mostrar _MENU_ registros", 
+    info: "Mostrando _START_ a _END_ de _TOTAL_",
+    infoEmpty: "Mostrando 0 a 0 de 0", 
+    emptyTable: "Sin datos", 
+    zeroRecords: "No se encontraron resultados",
+    paginate: { next: "Siguiente", previous: "Anterior" }
   },
-  ajax:{ url:'productos.php', type:'POST', data:{action:'list'}, dataSrc:'data' },
-  order:[[0,'desc']],
-  columns:[
-    { data:'id_producto' },
+  ajax: { 
+    url: 'productos.php', 
+    type: 'POST', 
+    data: {action: 'list'}, 
+    dataSrc: 'data' 
+  },
+  order: [[0, 'desc']],
+  columns: [
+    { data: 'id_producto' },
     { 
-    data: null, 
-    render: r => {
+      data: null, 
+      render: r => {
         let url = (r.imagen_principal && r.imagen_principal.trim() !== '') 
             ? `../${r.imagen_principal.trim()}` 
             : '../assets/img/productos/no-image.png';
         return `<img src="${url}" class="table-img" loading="lazy" onerror="this.src='../assets/img/productos/no-image.png'">`;
-    } 
+      } 
     },
-    { data:'nombre' },
-    { data:null, render:r=> r.categoria_nombre || '<span class="text-muted">—</span>' },
-    { data:null, render:r=> r.proveedor_principal_nombre || '<span class="text-muted">—</span>' },
-    { data:'precio_venta', render: v=> `S/ ${parseFloat(v||0).toFixed(2)}` },
-    { data:'stock' },
-    { data:'activo', render: v=> v==1 ? '<span class="badge bg-success badge-status">Activo</span>' : '<span class="badge bg-secondary badge-status">Inactivo</span>' },
-    { data:null, orderable:false, render:r=>{
-        const a = parseInt(r.atributos_count||0), v = parseInt(r.variaciones_count||0);
-        return (a+v)>0 ? `<button class="btn btn-sm btn-outline-info btn-ver-av" data-id="${r.id_producto}">Ver (${a}/${v})</button>` : '<span class="text-muted">—</span>';
+    { data: 'nombre' },
+    { data: null, render: r => r.categoria_nombre || '<span class="text-muted">—</span>' },
+    { data: null, render: r => r.proveedores_relacionados || '<span class="text-muted">—</span>' },
+    { data: 'precio_venta', render: v => `S/ ${parseFloat(v||0).toFixed(2)}` },
+    { data: 'stock' },
+    { data: 'activo', render: v => v==1 ? '<span class="badge bg-success badge-status">Activo</span>' : '<span class="badge bg-secondary badge-status">Inactivo</span>' },
+    { data: null, render: r => {
+        const a = parseInt(r.atributos_count||0);
+        return a > 0 ? `<span class="badge bg-info">${a} atributos</span>` : '<span class="text-muted">—</span>';
     }},
-    { data:null, orderable:false, render:r=>{
+    { data: null, orderable: false, render: r => {
         return `
           <div class="text-end">
-            <button class="btn btn-sm btn-outline-primary me-1 btn-editar" data-id="${r.id_producto}"><i class="fa fa-pen"></i></button>
-            <button class="btn btn-sm btn-outline-danger btn-eliminar" data-id="${r.id_producto}"><i class="fa fa-trash"></i></button>
+            <button class="btn btn-sm btn-outline-info me-1 btn-ver" data-id="${r.id_producto}" title="Ver detalles">
+              <i class="fa fa-eye"></i>
+            </button>
+            <button class="btn btn-sm btn-outline-primary me-1 btn-editar" data-id="${r.id_producto}" title="Editar">
+              <i class="fa fa-pen"></i>
+            </button>
+            <button class="btn btn-sm btn-outline-danger btn-eliminar" data-id="${r.id_producto}" title="Eliminar">
+              <i class="fa fa-trash"></i>
+            </button>
           </div>`;
     }}
   ]
 });
 
-function alerta(where, tipo, msg){
-  document.getElementById(where).innerHTML =
-    `<div class="alert alert-${tipo} alert-dismissible fade show" role="alert">
-      ${msg}
-      <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-    </div>`;
+function alerta(where, tipo, msg) {
+  const container = document.getElementById(where);
+  if (container) {
+    container.innerHTML = `
+      <div class="alert alert-${tipo} alert-dismissible fade show" role="alert">
+        ${msg}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      </div>`;
+  }
 }
 
-// Manejar selección de categoría
-$('#selectCategoria').change(function() {
-    const idCategoria = $(this).val();
-    if (idCategoria) {
-        cargarAtributosCategoria(idCategoria);
-    }
-});
-
-// Función para cargar atributos de la categoría
-function cargarAtributosCategoria(idCategoria) {
-    const fd = new FormData();
-    fd.append('action', 'get_atributos_categoria');
-    fd.append('id_categoria', idCategoria);
-    
-    fetch('productos.php', { method: 'POST', body: fd })
-        .then(r => r.json())
-        .then(j => {
-            if (j.status === 'ok') {
-                atributosCategoria = j.atributos;
-                mostrarCamposAtributos(j.atributos);
-            }
-        })
-        .catch(() => console.error('Error al cargar atributos'));
+function cambiarPaso(pasoActual, pasoSiguiente) {
+  document.querySelectorAll('.paso').forEach(paso => paso.classList.remove('activo'));
+  document.getElementById(pasoSiguiente).classList.add('activo');
+  
+  const titulos = {
+    'paso1': 'Paso 1: Categoría',
+    'paso2': 'Paso 2: Proveedor', 
+    'paso3': 'Paso 3: Producto',
+    'paso4': 'Paso 4: Atributos',
+    'paso5': 'Paso 5: Información final'
+  };
+  document.getElementById('pasoActual').textContent = titulos[pasoSiguiente];
 }
 
-// Mostrar campos de atributos
-function mostrarCamposAtributos(atributos) {
-    const container = $('#camposAtributos');
-    container.empty();
-    
-    if (atributos.length === 0) {
-        container.html('<div class="alert alert-info">Esta categoría no tiene atributos específicos.</div>');
-        return;
-    }
-    
-    atributos.forEach((atributo, index) => {
-        const campoId = `atributo_${atributo.id_atributo}`;
-        const requerido = atributo.obligatorio ? 'required' : '';
-        
-        let inputHtml = '';
-        switch(atributo.tipo_atributo) {
-            case 'numero':
-            case 'decimal':
-                inputHtml = `<input type="number" step="${atributo.tipo_atributo === 'decimal' ? '0.01' : '1'}" 
-                              class="form-control" id="${campoId}" name="atributos[${atributo.id_atributo}]" ${requerido}>`;
-                break;
-            case 'booleano':
-                inputHtml = `<select class="form-select" id="${campoId}" name="atributos[${atributo.id_atributo}]" ${requerido}>
-                                <option value="">Seleccionar...</option>
-                                <option value="1">Sí</option>
-                                <option value="0">No</option>
-                             </select>`;
-                break;
-            case 'fecha':
-                inputHtml = `<input type="date" class="form-control" id="${campoId}" 
-                              name="atributos[${atributo.id_atributo}]" ${requerido}>`;
-                break;
-            default: // texto
-                inputHtml = `<input type="text" class="form-control" id="${campoId}" 
-                              name="atributos[${atributo.id_atributo}]" ${requerido}>`;
-        }
-        
-        const campoHtml = `
-            <div class="mb-3">
-                <label for="${campoId}" class="form-label">${atributo.nombre_atributo} 
-                    ${atributo.obligatorio ? '<span class="text-danger">*</span>' : ''}
-                </label>
-                ${inputHtml}
-                <div class="form-text">Tipo: ${atributo.tipo_atributo}</div>
-            </div>
-        `;
-        
-        container.append(campoHtml);
-    });
-}
-
-// Navegación entre pasos
-$('#btnSiguiente').click(function() {
-    const categoriaId = $('#selectCategoria').val();
-    if (!categoriaId) {
-        alert('Por favor selecciona una categoría primero');
-        return;
-    }
-    
-    categoriaActual = $('#selectCategoria option:selected').text();
-    $('#categoriaSeleccionada').text('Categoría: ' + categoriaActual);
-    
-    // Mostrar paso 2, ocultar paso 1
-    $('#paso1').hide();
-    $('#paso2').show();
-    $('#footerPaso2').show();
-    $('#pasoActual').text('Paso 2: Datos del producto');
-});
-
-$('#btnAtras').click(function() {
-    // Mostrar paso 1, ocultar paso 2
-    $('#paso2').hide();
-    $('#footerPaso2').hide();
-    $('#paso1').show();
-    $('#pasoActual').text('Paso 1: Categoría');
-});
-
-// Resetear modal cuando se cierra
-$('#modalCrear').on('hidden.bs.modal', function () {
-    $('#paso2').hide();
-    $('#footerPaso2').hide();
-    $('#paso1').show();
-    $('#pasoActual').text('Paso 1: Categoría');
-    $('#selectCategoria').val('');
-    $('#camposAtributos').html('<div class="alert alert-info">Selecciona una categoría primero para ver los atributos requeridos.</div>');
-    document.getElementById('formCrear').reset();
-});
-
-/* CREAR con sistema de dos pasos */
-document.getElementById('formCrear').addEventListener('submit', function(e){
-  e.preventDefault();
-  
-  // Validar atributos obligatorios
-  const atributosObligatorios = atributosCategoria.filter(a => a.obligatorio);
-  let errores = [];
-  
-  atributosObligatorios.forEach(atributo => {
-    const campo = document.getElementById(`atributo_${atributo.id_atributo}`);
-    if (campo && !campo.value.trim()) {
-      errores.push(`${atributo.nombre_atributo} es obligatorio`);
-    }
-  });
-  
-  if (errores.length > 0) {
-    alerta('alertCrear', 'danger', 'Errores: ' + errores.join(', '));
+document.getElementById('btnSiguiente1').addEventListener('click', function() {
+  const categoriaId = document.getElementById('selectCategoria').value;
+  if (!categoriaId) {
+    alerta('alertCrear', 'warning', 'Por favor selecciona una categoría');
     return;
   }
   
-  const fd = new FormData(this);
-  fd.append('action','create');
+  const fd = new FormData();
+  fd.append('action', 'get_proveedores_categoria');
+  fd.append('id_categoria', categoriaId);
   
-  // Agregar todos los atributos al FormData
-  $('[name^="atributos["]').each(function() {
-    const name = $(this).attr('name');
-    const value = $(this).val();
-    fd.append(name, value);
-  });
-  
-  // Normalizar checkbox activo
-  if(!fd.has('activo')) fd.set('activo','0');
-
-  fetch('productos.php',{ method:'POST', body:fd })
-   .then(r=>r.json())
-   .then(j=>{
-     alerta('alertas', j.status==='ok'?'success':'danger', j.message||'');
-     if(j.status==='ok'){
-       this.reset();
-       const modal = bootstrap.Modal.getInstance(document.getElementById('modalCrear'));
-       modal.hide();
-       tabla.ajax.reload(null,false);
-       
-       // Resetear el modal
-       $('#paso2').hide();
-       $('#footerPaso2').hide();
-       $('#paso1').show();
-       $('#pasoActual').text('Paso 1: Categoría');
-       $('#selectCategoria').val('');
-       $('#camposAtributos').html('<div class="alert alert-info">Selecciona una categoría primero para ver los atributos requeridos.</div>');
-     }else{
-       alerta('alertCrear','danger', j.message||'Error');
-     }
-   })
-   .catch(()=> alerta('alertCrear','danger','Error de red'));
+  fetch('productos.php', { method: 'POST', body: fd })
+    .then(r => r.json())
+    .then(j => {
+      if (j.status === 'ok') {
+        const selectProveedor = document.getElementById('selectProveedor');
+        selectProveedor.innerHTML = '<option value="">Selecciona un proveedor...</option>';
+        
+        j.proveedores.forEach(proveedor => {
+          const option = document.createElement('option');
+          option.value = proveedor.id_proveedor;
+          option.textContent = proveedor.nombre_proveedor;
+          selectProveedor.appendChild(option);
+        });
+        
+        document.getElementById('categoriaSeleccionada').textContent = 
+          'Categoría: ' + document.getElementById('selectCategoria').options[document.getElementById('selectCategoria').selectedIndex].text;
+        
+        cambiarPaso('paso1', 'paso2');
+      } else {
+        alerta('alertCrear', 'danger', 'Error al cargar proveedores');
+      }
+    })
+    .catch(error => {
+      console.error('Error:', error);
+      alerta('alertCrear', 'danger', 'Error de conexión');
+    });
 });
 
-/* CARGAR datos para EDITAR */
-$(document).on('click','.btn-editar', function(){
-  const id = this.dataset.id;
-  const fd = new FormData();
-  fd.append('action','get');
-  fd.append('id', id);
-  fetch('productos.php',{ method:'POST', body:fd })
-    .then(r=>r.json())
-    .then(j=>{
-      if(j.status==='ok'){
-        const d = j.data.producto;
-        $('#edit_id').val(d.id_producto);
-        $('#edit_nombre').val(d.nombre_producto || d.nombre);
-        $('#edit_precio').val(d.precio);
-        $('#edit_stock').val(d.stock);
-        $('#edit_sku').val(d.sku || '');
-        $('#edit_categoria').val(d.id_categoria);
-        $('#edit_desc').val(d.descripcion||'');
-        $('#edit_activo').prop('checked', d.activo==1);
+// ...línea 848...
 
-        // Proveedores relacionados (solo lectura)
-        const prov = j.data.proveedores;
-        if(prov.length){
-          const lines = prov.map(p=> `• ${p.nombre} (código: ${p.codigo_proveedor||'—'}, compra: S/ ${parseFloat(p.precio_compra||0).toFixed(2)}, entrega: ${p.tiempo_entrega||0} día(s))`).join('\n');
-          $('#box_proveedores').text(lines);
-        }else{
-          $('#box_proveedores').text('(sin datos)');
+// Paso 2: Selección de proveedor
+document.getElementById('btnSiguiente2').addEventListener('click', function() {
+  const proveedorId = document.getElementById('selectProveedor').value;
+  if (!proveedorId) {
+    alerta('alertCrear', 'warning', 'Por favor selecciona un proveedor');
+    return;
+  }
+
+  const categoriaId = document.getElementById('selectCategoria').value;
+  const fd = new FormData();
+  fd.append('action', 'get_productos_catalogo');
+  fd.append('id_proveedor', proveedorId);
+  fd.append('id_categoria', categoriaId);
+
+  fetch('productos.php', { method: 'POST', body: fd })
+    .then(r => r.json())
+    .then(j => {
+      if (j.status === 'ok') {
+        const selectProducto = document.getElementById('selectProductoCatalogo');
+        selectProducto.innerHTML = '<option value="">Selecciona un producto...</option>';
+        j.productos.forEach(prod => {
+          const option = document.createElement('option');
+          option.value = prod.id_catalogo;
+          option.textContent = prod.nombre_producto + ' (' + prod.marca + ')';
+          selectProducto.appendChild(option);
+        });
+        document.getElementById('proveedorSeleccionado').textContent =
+          'Proveedor: ' + document.getElementById('selectProveedor').options[document.getElementById('selectProveedor').selectedIndex].text;
+        cambiarPaso('paso2', 'paso3');
+      } else {
+        alerta('alertCrear', 'danger', 'Error al cargar productos');
+      }
+    })
+    .catch(error => {
+      console.error('Error:', error);
+      alerta('alertCrear', 'danger', 'Error de conexión');
+    });
+});
+
+document.getElementById('btnAtras2').addEventListener('click', function() {
+  cambiarPaso('paso2', 'paso1');
+});
+
+// Paso 3: Selección de producto del catálogo
+document.getElementById('btnSiguiente3').addEventListener('click', function() {
+  const productoId = document.getElementById('selectProductoCatalogo').value;
+  if (!productoId) {
+    alerta('alertCrear', 'warning', 'Por favor selecciona un producto del catálogo');
+    return;
+  }
+
+  const fd = new FormData();
+  fd.append('action', 'get_atributos_producto');
+  fd.append('id_catalogo', productoId);
+
+  fetch('productos.php', { method: 'POST', body: fd })
+    .then(r => r.json())
+    .then(j => {
+      if (j.status === 'ok') {
+        // Mostrar info del producto
+        document.getElementById('infoProducto').style.display = 'block';
+        document.getElementById('nombreProducto').textContent = j.producto.nombre_producto;
+        document.getElementById('marcaProducto').textContent = 'Marca: ' + j.producto.marca;
+        document.getElementById('precioCompraProducto').textContent = 'Precio compra: S/ ' + parseFloat(j.producto.precio_compra).toFixed(2);
+
+        // Mostrar atributos
+        const spinners = document.getElementById('spinnersAtributos');
+        spinners.innerHTML = '';
+        atributosDisponibles = j.atributos || [];
+        if (atributosDisponibles.length === 0) {
+          spinners.innerHTML = '<div class="alert alert-info">Este producto no tiene atributos configurables.</div>';
+        } else {
+          atributosDisponibles.forEach(attr => {
+            const valores = attr.valores.map(v => `<option value="${v}">${v}</option>`).join('');
+            spinners.innerHTML += `
+              <div class="atributo-spinner mb-2">
+                <h6>${attr.nombre}</h6>
+                <select name="atributos[${attr.nombre}]" class="form-select">${valores}</select>
+              </div>
+            `;
+          });
         }
+        document.getElementById('productoSeleccionado').textContent =
+          'Producto: ' + j.producto.nombre_producto;
+        cambiarPaso('paso3', 'paso4');
+      } else {
+        alerta('alertCrear', 'danger', 'Error al cargar atributos');
+      }
+    })
+    .catch(error => {
+      console.error('Error:', error);
+      alerta('alertCrear', 'danger', 'Error de conexión');
+    });
+});
+
+document.getElementById('btnAtras3').addEventListener('click', function() {
+  cambiarPaso('paso3', 'paso2');
+});
+
+// Paso 4: Configuración de atributos
+document.getElementById('btnSiguiente4').addEventListener('click', function() {
+  cambiarPaso('paso4', 'paso5');
+});
+
+document.getElementById('btnAtras4').addEventListener('click', function() {
+  cambiarPaso('paso4', 'paso3');
+});
+
+// Paso 5: Información final
+document.getElementById('btnAtras5').addEventListener('click', function() {
+  cambiarPaso('paso5', 'paso4');
+});
+
+// Enviar formulario de creación
+document.getElementById('formCrear').addEventListener('submit', function(e) {
+  e.preventDefault();
+  const form = e.target;
+  const fd = new FormData(form);
+
+  // Agregar atributos seleccionados
+  atributosDisponibles.forEach(attr => {
+    const select = form.querySelector(`[name="atributos[${attr.nombre}]"]`);
+    if (select) {
+      fd.append(`atributos[${attr.nombre}]`, select.value);
+    }
+  });
+
+  fd.append('action', 'create');
+
+  fetch('productos.php', { method: 'POST', body: fd })
+    .then(r => r.json())
+    .then(j => {
+      if (j.status === 'ok') {
+        alerta('alertas', 'success', j.message);
+        $('#modalCrear').modal('hide');
+        tabla.ajax.reload();
+      } else {
+        alerta('alertCrear', 'danger', j.message);
+      }
+    })
+    .catch(error => {
+      console.error('Error:', error);
+      alerta('alertCrear', 'danger', 'Error de conexión');
+    });
+});
+
+// Ver detalles del producto
+$(document).on('click', '.btn-ver', function() {
+  const id = $(this).data('id');
+  const fd = new FormData();
+  fd.append('action', 'get');
+  fd.append('id', id);
+
+  fetch('productos.php', { method: 'POST', body: fd })
+    .then(r => r.json())
+    .then(j => {
+      if (j.status === 'ok') {
+        const p = j.data.producto;
+        $('#view_nombre').text(p.nombre_producto);
+        $('#view_descripcion').text(p.descripcion || '');
+        $('#view_precio').text('S/ ' + parseFloat(p.precio).toFixed(2));
+        $('#view_stock').text(p.stock);
+        $('#view_sku').text(p.sku || '');
+        $('#view_estado').removeClass('bg-success bg-secondary').addClass(p.activo == 1 ? 'bg-success' : 'bg-secondary').text(p.activo == 1 ? 'Activo' : 'Inactivo');
+        $('#view_imagen').attr('src', p.imagen_principal ? '../' + p.imagen_principal : '../assets/img/productos/no-image.png');
 
         // Atributos
-        const atr = j.data.atributos;
-        if(atr.length){
-          const lines = atr.map(a=> `• ${a.clave}: ${a.valor}`).join('\n');
-          $('#box_atributos').text(lines);
-        }else{
-          $('#box_atributos').text('(sin datos)');
-        }
+        let attrs = '';
+        (j.data.atributos || []).forEach(a => {
+          attrs += `<div><strong>${a.clave}:</strong> ${a.valor}</div>`;
+        });
+        $('#view_atributos_detalle').html(attrs || '<span class="text-muted">—</span>');
 
-        // Variaciones
-        const va = j.data.variaciones;
-        if(va.length){
-          const lines = va.map(v=>{
-            const opts = (v.opciones||[]).map(o=> `${o.valor}`).join(', ');
-            return `• ${v.nombre}: ${opts||'sin opciones'}`;
-          }).join('\n');
-          $('#box_variaciones').text(lines);
-        }else{
-          $('#box_variaciones').text('(sin datos)');
-        }
+        // Proveedores
+        let provs = '';
+        (j.data.proveedores || []).forEach(pr => {
+          provs += `<div><strong>${pr.nombre}:</strong> S/ ${parseFloat(pr.precio_compra).toFixed(2)}</div>`;
+        });
+        $('#view_proveedores_detalle').html(provs || '<span class="text-muted">—</span>');
 
-        new bootstrap.Modal(document.getElementById('modalEditar')).show();
+        $('#modalVerDetalles').modal('show');
+      } else {
+        alerta('alertas', 'danger', j.message);
       }
     });
 });
 
-/* GUARDAR edición */
-document.getElementById('formEditar').addEventListener('submit', function(e){
+// Editar producto
+$(document).on('click', '.btn-editar', function() {
+  const id = $(this).data('id');
+  const fd = new FormData();
+  fd.append('action', 'get');
+  fd.append('id', id);
+
+  fetch('productos.php', { method: 'POST', body: fd })
+    .then(r => r.json())
+    .then(j => {
+      if (j.status === 'ok') {
+        const p = j.data.producto;
+        $('#edit_id').val(p.id_producto);
+        $('#edit_nombre').val(p.nombre_producto);
+        $('#edit_precio').val(p.precio);
+        $('#edit_stock').val(p.stock);
+        $('#edit_sku').val(p.sku);
+        $('#edit_categoria').val(p.id_categoria);
+        $('#edit_desc').val(p.descripcion);
+        $('#edit_activo').prop('checked', p.activo == 1);
+
+        // Imagen actual
+        if (p.imagen_principal) {
+          $('#previewImagen').html(`<img src="../${p.imagen_principal}" class="img-fluid rounded" style="max-height:100px;">`);
+        } else {
+          $('#previewImagen').html('<span class="text-muted">Sin imagen</span>');
+        }
+
+        // Proveedores
+        let provs = '';
+        (j.data.proveedores || []).forEach(pr => {
+          provs += `<div><strong>${pr.nombre}:</strong> S/ ${parseFloat(pr.precio_compra).toFixed(2)}</div>`;
+        });
+        $('#box_proveedores').html(provs || '<span class="text-muted">—</span>');
+
+        // Atributos
+        let attrs = '';
+        (j.data.atributos || []).forEach(a => {
+          attrs += `<div><strong>${a.clave}:</strong> ${a.valor}</div>`;
+        });
+        $('#box_atributos').html(attrs || '<span class="text-muted">—</span>');
+
+        $('#modalEditar').modal('show');
+      } else {
+        alerta('alertas', 'danger', j.message);
+      }
+    });
+});
+
+// Guardar edición
+document.getElementById('formEditar').addEventListener('submit', function(e) {
   e.preventDefault();
-  const fd = new FormData(this);
-  fd.append('action','update');
-  if(!fd.has('activo')) fd.set('activo','0');
+  const fd = new FormData(e.target);
+  fd.append('action', 'update');
 
-  fetch('productos.php',{ method:'POST', body:fd })
-    .then(r=>r.json())
-    .then(j=>{
-      alerta('alertas', j.status==='ok'?'success':'danger', j.message||'');
-      if(j.status==='ok'){
-        const modal = bootstrap.Modal.getInstance(document.getElementById('modalEditar'));
-        modal.hide();
-        tabla.ajax.reload(null,false);
-      }else{
-        alerta('alertEditar','danger', j.message||'Error');
+  fetch('productos.php', { method: 'POST', body: fd })
+    .then(r => r.json())
+    .then(j => {
+      if (j.status === 'ok') {
+        alerta('alertas', 'success', j.message);
+        $('#modalEditar').modal('hide');
+        tabla.ajax.reload();
+      } else {
+        alerta('alertEditar', 'danger', j.message);
       }
     })
-    .catch(()=> alerta('alertEditar','danger','Error de red'));
+    .catch(error => {
+      console.error('Error:', error);
+      alerta('alertEditar', 'danger', 'Error de conexión');
+    });
 });
 
-/* ELIMINAR */
-$(document).on('click','.btn-eliminar', function(){
-  const id = this.dataset.id;
-  if(!confirm('¿Eliminar el producto #'+id+'?')) return;
+// Eliminar producto
+$(document).on('click', '.btn-eliminar', function() {
+  if (!confirm('¿Seguro que deseas eliminar este producto?')) return;
+  const id = $(this).data('id');
   const fd = new FormData();
-  fd.append('action','delete');
+  fd.append('action', 'delete');
   fd.append('id', id);
-  fetch('productos.php',{ method:'POST', body:fd })
-    .then(r=>r.json())
-    .then(j=>{
-      alerta('alertas', j.status==='ok'?'success':'danger', j.message||'Error');
-      if(j.status==='ok') tabla.ajax.reload(null,false);
-    })
-    .catch(()=> alerta('alertas','danger','Error de red'));
-});
 
-/* VER A/V desde la tabla */
-$(document).on('click','.btn-ver-av', function(){
-  const id = this.dataset.id;
-  const fd = new FormData();
-  fd.append('action','get');
-  fd.append('id', id);
-  fetch('productos.php',{ method:'POST', body:fd })
-    .then(r=>r.json())
-    .then(j=>{
-      if(j.status==='ok'){
-        const atr = j.data.atributos;
-        const va  = j.data.variaciones;
-
-        const atrTxt = atr.length
-          ? atr.map(a=> `• ${a.clave}: ${a.valor}`).join('\n')
-          : '(sin datos)';
-        const vaTxt = va.length
-          ? va.map(v=>{
-              const opts = (v.opciones||[]).map(o=> `${o.valor}`).join(', ');
-              return `• ${v.nombre}: ${opts||'sin opciones'}`;
-            }).join('\n')
-          : '(sin datos)';
-
-        $('#view_atributos').text(atrTxt);
-        $('#view_variaciones').text(vaTxt);
-        new bootstrap.Modal(document.getElementById('modalVerAV')).show();
+  fetch('productos.php', { method: 'POST', body: fd })
+    .then(r => r.json())
+    .then(j => {
+      if (j.status === 'ok') {
+        alerta('alertas', 'success', j.message);
+        tabla.ajax.reload();
+      } else {
+        alerta('alertas', 'danger', j.message);
       }
     });
+});
+
+// Resetear modal al cerrar
+$('#modalCrear').on('hidden.bs.modal', function () {
+  document.getElementById('formCrear').reset();
+  document.getElementById('infoProducto').style.display = 'none';
+  document.getElementById('spinnersAtributos').innerHTML = '<div class="alert alert-info">Selecciona un producto para ver sus atributos disponibles.</div>';
+  cambiarPaso('paso5', 'paso1');
+  document.getElementById('alertCrear').innerHTML = '';
 });
 </script>
 </body>

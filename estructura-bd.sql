@@ -75,6 +75,45 @@ CREATE TABLE producto_proveedor (
 ) ENGINE=InnoDB;
 
 -- =====================
+-- RELACIÓN: proveedor_categoria (M:N)
+-- =====================
+CREATE TABLE proveedor_categoria (
+    id_relacion INT AUTO_INCREMENT PRIMARY KEY,
+    id_proveedor INT NOT NULL,
+    id_categoria INT NOT NULL,
+    UNIQUE (id_proveedor, id_categoria),
+    FOREIGN KEY (id_proveedor) REFERENCES proveedores(id_proveedor) ON DELETE CASCADE,
+    FOREIGN KEY (id_categoria) REFERENCES categorias(id_categoria) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+CREATE TABLE catalogo_proveedor (
+    id_catalogo INT AUTO_INCREMENT PRIMARY KEY,
+    id_proveedor INT NOT NULL,
+    id_categoria INT NOT NULL,
+    nombre_producto VARCHAR(200) NOT NULL,
+    marca VARCHAR(150),
+    precio_compra DECIMAL(10,2) NOT NULL DEFAULT 0,
+    activo BOOLEAN DEFAULT TRUE,
+    fecha_registro TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (id_proveedor, id_categoria, nombre_producto),
+    FOREIGN KEY (id_proveedor) REFERENCES proveedores(id_proveedor) ON DELETE CASCADE,
+    FOREIGN KEY (id_categoria) REFERENCES categorias(id_categoria) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+CREATE TABLE catalogo_proveedor_atributos (
+    id_catalogo INT NOT NULL,
+    id_atributo INT NOT NULL,
+    valor_texto VARCHAR(255),
+    valor_numero INT,
+    valor_decimal DECIMAL(18,6),
+    valor_booleano BOOLEAN,
+    valor_fecha DATE,
+    PRIMARY KEY (id_catalogo, id_atributo),
+    FOREIGN KEY (id_catalogo) REFERENCES catalogo_proveedor(id_catalogo) ON DELETE CASCADE,
+    FOREIGN KEY (id_atributo) REFERENCES atributos(id_atributo) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+-- =====================
 -- ATRIBUTOS DINÁMICOS
 -- =====================
 -- atributos: lista de posibles atributos (ej: Color, Diametro, Litros)
@@ -461,3 +500,51 @@ INSERT INTO categorias_atributos (id_categoria, id_atributo, obligatorio, orden)
 VALUES
 ((SELECT id_categoria FROM categorias WHERE nombre_categoria='Almacenamiento y Organización'), (SELECT id_atributo FROM atributos WHERE nombre_atributo='Material_Almacenamiento'), TRUE, 1),
 ((SELECT id_categoria FROM categorias WHERE nombre_categoria='Almacenamiento y Organización'), (SELECT id_atributo FROM atributos WHERE nombre_atributo='Capacidad_Litros'), FALSE, 2);
+
+-- =====================
+-- INSERTAR PROVEEDORES
+-- =====================
+INSERT INTO proveedores (nombre_proveedor, telefono, email, direccion, ruc, activo) VALUES
+('Indeco S.A.', '987654321', 'ventas@indeco.com', 'Av. Industrial 123, Lima', '20123456789', TRUE),
+('FerreMax Distribuciones', '999888777', 'contacto@ferremax.com', 'Jr. Ferretería 456, Arequipa', '20456789123', TRUE),
+('Pinturas Andinas', '988776655', 'info@pinturasandinas.com', 'Av. Colores 789, Cusco', '20987654321', TRUE),
+('Herramientas del Sur', '977665544', 'ventas@herramientasdelsur.com', 'Av. Talleres 321, Arequipa', '20567891234', TRUE),
+('ElectroSuministros Perú', '966554433', 'atencion@electrosuministros.com', 'Av. Electricidad 654, Trujillo', '20876543210', TRUE);
+
+-- ==============================
+-- RELACIÓN PROVEEDOR - CATEGORÍA
+-- ==============================
+-- Indeco: distribuye Pinturas y Barnices, Cintas y Adhesivos
+INSERT INTO proveedor_categoria (id_proveedor, id_categoria) VALUES
+((SELECT id_proveedor FROM proveedores WHERE nombre_proveedor='Indeco S.A.'),
+ (SELECT id_categoria FROM categorias WHERE nombre_categoria='Pinturas y Barnices')),
+((SELECT id_proveedor FROM proveedores WHERE nombre_proveedor='Indeco S.A.'),
+ (SELECT id_categoria FROM categorias WHERE nombre_categoria='Cintas y Adhesivos'));
+ -- FerreMax: distribuye Tornillos, Tuercas y Pernos, Clavos y Grapas, Ferretería General
+INSERT INTO proveedor_categoria (id_proveedor, id_categoria) VALUES
+((SELECT id_proveedor FROM proveedores WHERE nombre_proveedor='FerreMax Distribuciones'),
+ (SELECT id_categoria FROM categorias WHERE nombre_categoria='Tornillos, Tuercas y Pernos')),
+((SELECT id_proveedor FROM proveedores WHERE nombre_proveedor='FerreMax Distribuciones'),
+ (SELECT id_categoria FROM categorias WHERE nombre_categoria='Clavos y Grapas')),
+((SELECT id_proveedor FROM proveedores WHERE nombre_proveedor='FerreMax Distribuciones'),
+ (SELECT id_categoria FROM categorias WHERE nombre_categoria='Ferretería General / Accesorios'));
+-- Pinturas Andinas: solo Pinturas y Barnices
+INSERT INTO proveedor_categoria (id_proveedor, id_categoria) VALUES
+((SELECT id_proveedor FROM proveedores WHERE nombre_proveedor='Pinturas Andinas'),
+ (SELECT id_categoria FROM categorias WHERE nombre_categoria='Pinturas y Barnices'));
+-- Herramientas del Sur: Herramientas Manuales, Seguridad y Protección, Almacenamiento
+INSERT INTO proveedor_categoria (id_proveedor, id_categoria) VALUES
+((SELECT id_proveedor FROM proveedores WHERE nombre_proveedor='Herramientas del Sur'),
+ (SELECT id_categoria FROM categorias WHERE nombre_categoria='Herramientas Manuales')),
+((SELECT id_proveedor FROM proveedores WHERE nombre_proveedor='Herramientas del Sur'),
+ (SELECT id_categoria FROM categorias WHERE nombre_categoria='Seguridad y Protección')),
+((SELECT id_proveedor FROM proveedores WHERE nombre_proveedor='Herramientas del Sur'),
+ (SELECT id_categoria FROM categorias WHERE nombre_categoria='Almacenamiento y Organización'));
+-- ElectroSuministros Perú: Electricidad, Fontanería, Lubricantes y Aceites
+INSERT INTO proveedor_categoria (id_proveedor, id_categoria) VALUES
+((SELECT id_proveedor FROM proveedores WHERE nombre_proveedor='ElectroSuministros Perú'),
+ (SELECT id_categoria FROM categorias WHERE nombre_categoria='Electricidad')),
+((SELECT id_proveedor FROM proveedores WHERE nombre_proveedor='ElectroSuministros Perú'),
+ (SELECT id_categoria FROM categorias WHERE nombre_categoria='Fontanería')),
+((SELECT id_proveedor FROM proveedores WHERE nombre_proveedor='ElectroSuministros Perú'),
+ (SELECT id_categoria FROM categorias WHERE nombre_categoria='Lubricantes y Aceites'));
