@@ -2,10 +2,10 @@
 session_start();
 
 if (isset($_SESSION['autenticado'])) {
-    $rol = $_SESSION['usuario_data']['rol'];
+    $rol = $_SESSION['usuario_data']['rol']['estado'];
     if ($rol == 'admin') {
-        header("Location: admin_dashboard.php");
-    } elseif ($rol == 'logistico') {
+        header("Location: ../admin/admin_dashboard.php");
+    } elseif ($rol == 'logistico' && $estado == 'activo') {
         header("Location: ../logistico/logistico_dashboard.php");
     } else {
         header("Location: index_home.php");
@@ -35,8 +35,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             $_SESSION['usuario_data'] = $usuario_data;
 
             if ($usuario_data['rol'] == 'admin') {
-                header("Location: admin_dashboard.php");
-            } elseif ($usuario_data['rol'] == 'logistico') {
+                header("Location: ../admin/admin_dashboard.php");
+            } elseif ($usuario_data['rol'] == 'logistico' && $usuario_data['estado'] =='activo') {
                 header("Location: ../logistico/logistico_dashboard.php");
             } else {
                 header("Location: index_home.php");
