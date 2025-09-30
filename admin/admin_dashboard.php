@@ -1,6 +1,6 @@
 <?php
 session_start();
-include("../config/conexion.php"); 
+include("../config/conexion.php");
 
 // ==========================================================
 // 1. CONTROL DE ACCESO
@@ -36,11 +36,11 @@ if (isset($_GET['action']) && isset($_GET['id'])) {
         $sql_update = "UPDATE usuarios SET estado = ? WHERE id_usuario = ? AND rol = 'logistico'";
         $stmt_update = $conn->prepare($sql_update);
         // El 's' es para string (new_estado) y 'i' para integer (id_logistico)
-        $stmt_update->bind_param("si", $new_estado, $id_logistico); 
+        $stmt_update->bind_param("si", $new_estado, $id_logistico);
         $stmt_update->execute();
-        
+
         // Redirigir para limpiar los parámetros GET de la URL
-        header("Location: admin_dashboard.php?msg=" . $action); 
+        header("Location: admin_dashboard.php?msg=" . $action);
         exit();
     }
 }
@@ -50,10 +50,10 @@ if (isset($_GET['action']) && isset($_GET['id'])) {
 // ==========================================================
 
 // Consulta para obtener todos los usuarios logísticos.
-$sql = "SELECT id_usuario, usuario, email, telefono, estado, fecha_registro 
-        FROM usuarios 
-        WHERE rol = 'logistico'
-        ORDER BY estado ASC, fecha_registro DESC"; // Ordena por estado para agrupar suspendidos
+$sql = "SELECT id_usuario, usuario, email, telefono, estado, fecha_registro
+         FROM usuarios
+         WHERE rol = 'logistico'
+         ORDER BY estado ASC, fecha_registro DESC"; // Ordena por estado para agrupar suspendidos
 $result = $conn->query($sql);
 
 ?>
@@ -66,6 +66,7 @@ $result = $conn->query($sql);
     <title>Gestión Logística - Panel de Administrador</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="../assets/css/styles.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <style>
         /* Estilos básicos para la estructura del Dashboard */
         .sidebar {
@@ -85,6 +86,15 @@ $result = $conn->query($sql);
             background-color: #495057;
             color: #fff;
         }
+        /* ⭐ Estilo para que el enlace de Agregar se vea como un botón/link del menú ⭐ */
+        .sidebar .add-link-style {
+            color: #adb5bd; 
+        }
+        .sidebar .add-link-style:hover {
+            color: #fff;
+            background-color: #495057; 
+        }
+        
         .main-content {
             margin-left: 250px; /* Offset para el sidebar */
             padding: 20px;
@@ -108,35 +118,42 @@ $result = $conn->query($sql);
         <p class="text-secondary text-center">Bienvenido, <?php echo htmlspecialchars($_SESSION['usuario_data']['usuario'] ?? 'Admin'); ?></p>
         <hr class="text-white-50">
         <ul class="list-unstyled components">
-            <li><a href="admin_dashboard.php">Dashboard General</a></li>
-            <li><a href="admin_dashboard.php" class="bg-secondary text-white fw-bold">Gestión Logístico</a></li>
-            <li><a href="#">Gestión de Productos</a></li>
-            <li><a href="#">Reportes de Ventas</a></li>
+            <li><a href="admin_dashboard_general.php"><i class="fas fa-tachometer-alt me-2"></i> Dashboard General</a></li>
             
-            <li class="mt-5"><a href="../public/logout.php" class="btn btn-danger btn-sm w-100">Cerrar Sesión</a></li>
+            <li><a href="admin_dashboard.php" class="bg-secondary text-white fw-bold"><i class="fas fa-truck me-2"></i>Gestión Logístico</a></li>
+            
+            <li>
+                <a href="admin_registrar_logistico.php" class="add-link-style">
+                    <i class="fas fa-user-plus me-2"></i> Agregar Nuevo Logístico
+                </a>
+            </li>
+            
+            <hr class="text-white-50">
+
+            <li><a href="#"><i class="fas fa-boxes me-2"></i> Gestión de Productos</a></li>
+            <li><a href="#"><i class="fas fa-chart-line me-2"></i> Reportes de Ventas</a></li>
+            
+            <li class="mt-5"><a href="../public/logout.php" class="btn btn-danger btn-sm w-100"><i class="fas fa-sign-out-alt me-2"></i> Cerrar Sesión</a></li>
         </ul>
     </div>
 
     <div class="main-content flex-grow-1">
         <h2 class="mb-4">Gestión de Usuarios Logístico</h2>
         
-        <div class="d-flex justify-content-end mb-3">
-            <a href="admin_add_logistico.php" class="btn btn-success"><i class="fas fa-plus"></i> Agregar Logístico</a>
-        </div>
-
         <?php 
-        // Mostrar mensajes de éxito
+        // Mostrar mensajes de éxito. Se añade 'logistico_agregado' para la nueva página.
         if (isset($_GET['msg'])) {
             $msg_text = match($_GET['msg']) {
                 'suspender' => 'Usuario suspendido correctamente.',
                 'activar' => 'Usuario activado correctamente.',
                 'eliminar' => 'Usuario eliminado lógicamente.',
+                'logistico_agregado' => '¡Nuevo logístico registrado exitosamente!', // Mensaje añadido
                 default => 'Acción realizada.',
             };
             echo '<div class="alert alert-success alert-dismissible fade show" role="alert">
-                    <strong>¡Éxito!</strong> ' . htmlspecialchars($msg_text) . '
-                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                  </div>';
+                      <strong>¡Éxito!</strong> ' . htmlspecialchars($msg_text) . '
+                      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>';
         }
         ?>
 
@@ -201,5 +218,6 @@ $result = $conn->query($sql);
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://kit.fontawesome.com/your-font-awesome-kit.js" crossorigin="anonymous"></script> 
 </body>
 </html>
