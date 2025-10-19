@@ -12,24 +12,35 @@ if (!isset($_SESSION['autenticado']) || $_SESSION['usuario_data']['rol'] !== 'ad
 }
 
 // ==========================================================
-// 2. CONFIGURACIÓN DE FILTROS DE VENTA
+// 2. CONFIGURACIÓN DE FILTROS DE VENTA (RANGO DE FECHAS)
 // ==========================================================
 
-// Obtener los valores del formulario de filtro
-$filtro_anio = $_GET['filtro_anio'] ?? '';
-$filtro_mes_inicio = $_GET['filtro_mes_inicio'] ?? '';
-$filtro_mes_fin = $_GET['filtro_mes_fin'] ?? '';
-$filtro_dia_inicio = $_GET['filtro_dia_inicio'] ?? '';
-$filtro_dia_fin = $_GET['filtro_dia_fin'] ?? '';
+// Obtener los valores del formulario de filtro (usamos GET)
+$fecha_inicio = $_GET['fecha_inicio'] ?? '';
+$fecha_fin = $_GET['fecha_fin'] ?? '';
 
-// Array para el selector de meses
+// Variables de fecha para la consulta
+$db_fecha_inicio = $fecha_inicio;
+$db_fecha_fin = $fecha_fin;
+
+// Establecer valores por defecto si no hay filtro activo
+if (empty($db_fecha_inicio) || empty($db_fecha_fin)) {
+    // Si no hay filtro, busca el rango más amplio o un rango por defecto (ej: últimos 30 días)
+    // Para simplificar, usaremos un rango amplio si no se especifican.
+    // Para no poner valores por defecto en el input date, los dejamos vacíos.
+    $filtro_activo = false;
+} else {
+    $filtro_activo = true;
+}
+
+// Array para el selector de meses (Mantenido por si es necesario en otras partes, pero no usado en el filtro)
 $meses = [
     '01' => 'Enero', '02' => 'Febrero', '03' => 'Marzo', '04' => 'Abril',
     '05' => 'Mayo', '06' => 'Junio', '07' => 'Julio', '08' => 'Agosto',
     '09' => 'Septiembre', '10' => 'Octubre', '11' => 'Noviembre', '12' => 'Diciembre'
 ];
 
-// Obtener los años disponibles en la DB (para el selector de años)
+// Obtener los años disponibles en la DB (Mantenido, aunque ya no es parte del filtro)
 $sql_anios = "SELECT DISTINCT YEAR(fecha) AS anio FROM transacciones WHERE tipo = 'compra' ORDER BY anio DESC";
 $result_anios = $conn->query($sql_anios);
 $anios_disponibles = $result_anios->fetch_all(MYSQLI_ASSOC);
@@ -37,6 +48,7 @@ $anios_disponibles = $result_anios->fetch_all(MYSQLI_ASSOC);
 // ==========================================================
 // 3. CONSULTAS DE KPI GENERALES (SIN FILTRO)
 // ==========================================================
+// (Esta sección no cambia)
 
 // Ventas Totales Históricas (KPI 1)
 $sql_ventas_totales = "SELECT COALESCE(SUM(monto), 0) AS total FROM transacciones WHERE tipo = 'compra'";
@@ -58,70 +70,39 @@ $sql_clientes = "SELECT COUNT(id_usuario) AS total FROM usuarios WHERE rol = 'cl
 $result_clientes = $conn->query($sql_clientes);
 $clientes_registrados = $result_clientes->fetch_assoc()['total'];
 
-// Alertas de Bajo Stock (KPI 5)
+// Proveedores Registrados (KPI 5)
+$sql_proveedores = "SELECT COUNT(id_proveedor) AS total FROM proveedores WHERE activo = 1";
+$result_proveedores = $conn->query($sql_proveedores);
+$proveedores_registrados = $result_proveedores->fetch_assoc()['total'];
+
+// Alertas de Bajo Stock (KPI 6)
 $sql_alerta_stock = "SELECT COUNT(id_producto) AS total FROM productos WHERE activo = 1 AND stock > 0 AND stock < 10";
 $result_alerta_stock = $conn->query($sql_alerta_stock);
 $alertas_stock = $result_alerta_stock->fetch_assoc()['total'];
 
 
 // ==========================================================
-// 4. CONSULTA DE VENTAS FILTRADAS (LÓGICA MEJORADA)
+// 4. CONSULTA DE VENTAS FILTRADAS (LÓGICA ACTUALIZADA)
 // ==========================================================
 
 $ventas_filtradas = 0;
-$filtro_aplicado_texto = "Ventas Totales Históricas"; // Texto inicial para el título del KPI
+$filtro_aplicado_texto = "Ventas Totales Históricas";
 $condiciones = ["tipo = 'compra'"];
 $bind_types = "";
 $bind_params = [];
-$filtro_activo = false;
 
-// --- 4.1. Aplicar filtro de Año (Obligatorio para Meses/Días)
-if (!empty($filtro_anio)) {
-    $condiciones[] = "YEAR(fecha) = ?";
-    $bind_types .= "i";
-    $bind_params[] = &$filtro_anio;
-    $filtro_activo = true;
-    $filtro_aplicado_texto = "Ventas del Año " . htmlspecialchars($filtro_anio);
-}
+if ($filtro_activo) {
+    // Aplicar filtro de Rango de Fechas
+    // Añadimos 23:59:59 a la fecha de fin para incluir todo el último día
+    $db_fecha_fin_full = $db_fecha_fin . ' 23:59:59'; 
 
-// --- 4.2. Aplicar filtro de Rango de Meses (Requiere Año)
-if (!empty($filtro_mes_inicio) && !empty($filtro_mes_fin)) {
-    // Si el mes de inicio es mayor que el mes final, asumimos que es el mismo mes
-    $mes_inicio = min($filtro_mes_inicio, $filtro_mes_fin);
-    $mes_fin = max($filtro_mes_inicio, $filtro_mes_fin);
-
-    $condiciones[] = "MONTH(fecha) BETWEEN ? AND ?";
-    $bind_types .= "ii";
-    $bind_params[] = &$mes_inicio;
-    $bind_params[] = &$mes_fin;
-    $filtro_activo = true;
+    $condiciones[] = "fecha BETWEEN ? AND ?";
+    $bind_types .= "ss";
+    $bind_params[] = &$db_fecha_inicio;
+    $bind_params[] = &$db_fecha_fin_full;
     
-    // Actualizar el texto
-    $texto_mes = " de " . $meses[$mes_inicio] . " a " . $meses[$mes_fin];
-    $filtro_aplicado_texto = (empty($filtro_anio) ? "Ventas Anuales" : "Ventas del Año " . htmlspecialchars($filtro_anio)) . $texto_mes;
+    $filtro_aplicado_texto = "Ventas del " . htmlspecialchars($fecha_inicio) . " al " . htmlspecialchars($fecha_fin);
 }
-
-// --- 4.3. Aplicar filtro de Rango de Días (Requiere Año y/o Mes)
-if (!empty($filtro_dia_inicio) && !empty($filtro_dia_fin)) {
-    // Asegurarse de que el día de inicio sea menor o igual al día final
-    $dia_inicio = min($filtro_dia_inicio, $filtro_dia_fin);
-    $dia_fin = max($filtro_dia_inicio, $filtro_dia_fin);
-
-    $condiciones[] = "DAYOFMONTH(fecha) BETWEEN ? AND ?";
-    $bind_types .= "ii";
-    $bind_params[] = &$dia_inicio;
-    $bind_params[] = &$dia_fin;
-    $filtro_activo = true;
-
-    // Actualizar el texto
-    $texto_dia = " (días " . htmlspecialchars($dia_inicio) . " al " . htmlspecialchars($dia_fin) . ")";
-    if ($filtro_aplicado_texto == "Ventas Totales Históricas") {
-         $filtro_aplicado_texto = "Ventas por Días del Mes" . $texto_dia;
-    } else {
-        $filtro_aplicado_texto .= $texto_dia;
-    }
-}
-
 
 $sql_filtrada = "SELECT COALESCE(SUM(monto), 0) AS total_filtrado FROM transacciones WHERE " . implode(" AND ", $condiciones);
 
@@ -204,6 +185,12 @@ if (!$filtro_activo) {
             font-size: 2.5rem;
             font-weight: bold;
         }
+        /* Estilo del card-header personalizado */
+        .card-header-blue {
+            background-color: #0d6efd; /* Azul de Bootstrap Primary */
+            color: white;
+            font-weight: bold;
+        }
     </style>
 </head>
 <body>
@@ -215,18 +202,15 @@ if (!$filtro_activo) {
         <hr class="text-white-50">
         <ul class="list-unstyled components">
             <li>
-                <a href="admin_dashboard_general.php" class="active-link">
-                    <i class="fas fa-tachometer-alt me-2"></i> **Dashboard General**
+                <a href="admin_dashboard_general.php" class="active-link"> ⚖ Dashboard General
                 </a>
             </li>
             
-            <li><a href="admin_dashboard.php"><i class="fas fa-truck me-2"></i> Gestión Logístico</a></li>
-            <li><a href="admin_registrar_logistico.php"><i class="fas fa-user-plus me-2"></i> Agregar Nuevo Logístico</a></li>
-            
-            <hr class="text-white-50">
+            <li><a href="admin_dashboard.php">  🔑 Gestión Logístico</a></li>
+            <li><a href="admin_registrar_logistico.php">📥 Agregar Nuevo Logístico</a></li>
+            <li><a href="admin_proveedores.php">👨🏽‍🤝‍👨🏻 Proveedores</a></li>          
 
-            <li><a href="#"><i class="fas fa-boxes me-2"></i> Gestión de Productos</a></li>
-            <li><a href="#"><i class="fas fa-chart-line me-2"></i> Reportes de Ventas</a></li>
+            <li><a href="admin_reporte_ventas.php">📊 Reportes de Ventas</a></li>
             
             <li class="mt-5"><a href="../public/logout.php" class="btn btn-danger btn-sm w-100"><i class="fas fa-sign-out-alt me-2"></i> Cerrar Sesión</a></li>
         </ul>
@@ -236,80 +220,26 @@ if (!$filtro_activo) {
         <h2 class="mb-4">Resumen General del Sistema</h2>
         
         <div class="card shadow mb-4">
-            <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
-                <h5 class="mb-0"><i class="fas fa-filter me-2"></i> Filtros de Ventas por Período</h5>
-                <a class="btn btn-outline-light btn-sm" href="admin_dashboard_general.php"><i class="fas fa-sync-alt me-1"></i> Restablecer Filtros</a>
+            <div class="card-header card-header-blue d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="fas fa-filter me-2"></i> Filtros Personalizados (Rango de Fechas)</h5>
+                <a class="btn btn-sm btn-outline-light" href="admin_dashboard_general.php"><i class="fas fa-sync-alt me-1"></i> Limpiar Filtros</a>
             </div>
-            <div class="card-body">
-                <form action="admin_dashboard_general.php" method="GET" class="row g-3 align-items-end">
-                    
-                    <div class="col-md-3">
-                        <label for="filtro_anio" class="form-label small fw-bold">1. Seleccionar Año:</label>
-                        <select class="form-select" id="filtro_anio" name="filtro_anio">
-                            <option value="">(Todos los Años)</option>
-                            <?php foreach ($anios_disponibles as $anio): ?>
-                                <option value="<?php echo $anio['anio']; ?>" <?php echo ($filtro_anio == $anio['anio']) ? 'selected' : ''; ?>>
-                                    <?php echo $anio['anio']; ?>
-                                </option>
-                            <?php endforeach; ?>
-                        </select>
+            <div class="card-body filter-form-container">
+                <form action="admin_dashboard_general.php" method="GET" class="row align-items-end">
+                    <div class="col-md-4 mb-3">
+                        <label for="fecha_inicio" class="form-label">Fecha de Inicio</label>
+                        <input type="date" class="form-control" id="fecha_inicio" name="fecha_inicio" value="<?php echo htmlspecialchars($fecha_inicio); ?>" required>
                     </div>
-
-                    <div class="col-md-2">
-                        <label for="filtro_mes_inicio" class="form-label small fw-bold">2. Mes Inicio:</label>
-                        <select class="form-select" id="filtro_mes_inicio" name="filtro_mes_inicio">
-                            <option value="">(Cualquier Mes)</option>
-                            <?php foreach ($meses as $num => $nombre): ?>
-                                <option value="<?php echo $num; ?>" <?php echo ($filtro_mes_inicio == $num) ? 'selected' : ''; ?>>
-                                    <?php echo $nombre; ?>
-                                </option>
-                            <?php endforeach; ?>
-                        </select>
+                    <div class="col-md-4 mb-3">
+                        <label for="fecha_fin" class="form-label">Fecha de Fin</label>
+                        <input type="date" class="form-control" id="fecha_fin" name="fecha_fin" value="<?php echo htmlspecialchars($fecha_fin); ?>" required>
                     </div>
-
-                    <div class="col-md-2">
-                        <label for="filtro_mes_fin" class="form-label small fw-bold">Mes Fin:</label>
-                        <select class="form-select" id="filtro_mes_fin" name="filtro_mes_fin">
-                            <option value="">(Cualquier Mes)</option>
-                            <?php foreach ($meses as $num => $nombre): ?>
-                                <option value="<?php echo $num; ?>" <?php echo ($filtro_mes_fin == $num) ? 'selected' : ''; ?>>
-                                    <?php echo $nombre; ?>
-                                </option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-                    
-                    <div class="col-md-1">
-                        <label for="filtro_dia_inicio" class="form-label small fw-bold">3. Día Inicio:</label>
-                        <select class="form-select" id="filtro_dia_inicio" name="filtro_dia_inicio">
-                            <option value="">-</option>
-                            <?php for ($i = 1; $i <= 31; $i++): ?>
-                                <option value="<?php echo $i; ?>" <?php echo ($filtro_dia_inicio == $i) ? 'selected' : ''; ?>>
-                                    <?php echo $i; ?>
-                                </option>
-                            <?php endfor; ?>
-                        </select>
-                    </div>
-
-                    <div class="col-md-1">
-                        <label for="filtro_dia_fin" class="form-label small fw-bold">Día Fin:</label>
-                        <select class="form-select" id="filtro_dia_fin" name="filtro_dia_fin">
-                            <option value="">-</option>
-                            <?php for ($i = 1; $i <= 31; $i++): ?>
-                                <option value="<?php echo $i; ?>" <?php echo ($filtro_dia_fin == $i) ? 'selected' : ''; ?>>
-                                    <?php echo $i; ?>
-                                </option>
-                            <?php endfor; ?>
-                        </select>
-                    </div>
-                    
-                    <div class="col-md-3">
-                        <button type="submit" class="btn btn-primary w-100"><i class="fas fa-search me-1"></i> Aplicar Filtro</button>
+                    <div class="col-md-4 mb-3 d-grid">
+                        <button type="submit" class="btn btn-primary"><i class="fas fa-search me-2"></i> Aplicar Filtros</button>
                     </div>
                 </form>
             </div>
         </div>
-
         <div class="row g-4">
             
             <div class="col-md-6 col-lg-3">
@@ -359,6 +289,18 @@ if (!$filtro_activo) {
                     </div>
                 </div>
             </div>
+            
+            <div class="col-md-6 col-lg-3">
+                <div class="card bg-warning text-dark kpi-card">
+                    <div class="card-body d-flex justify-content-between align-items-center">
+                        <div>
+                            <div class="text-uppercase small">Proveedores Registrados</div>
+                            <div class="kpi-value"><?php echo number_format($proveedores_registrados); ?></div>
+                        </div>
+                        <i class="fas fa-truck-loading kpi-icon"></i>
+                    </div>
+                </div>
+            </div>
 
             <div class="col-md-6 col-lg-3">
                 <div class="card bg-dark text-white kpi-card">
@@ -374,7 +316,7 @@ if (!$filtro_activo) {
             
             <?php if ($alertas_stock > 0): ?>
             <div class="col-md-6 col-lg-3">
-                <div class="card bg-warning text-dark kpi-card">
+                <div class="card bg-danger text-white kpi-card"> 
                     <div class="card-body d-flex justify-content-between align-items-center">
                         <div>
                             <div class="text-uppercase small">🚨 Productos Bajo Stock</div>
@@ -403,7 +345,7 @@ if (!$filtro_activo) {
                 </a>
             </div>
             <div class="col-md-4">
-                <a href="#" class="text-decoration-none">
+                <a href="admin_proveedores.php" class="text-decoration-none">
                     <div class="card text-center p-4 h-100 shadow-sm bg-light">
                         <i class="fas fa-boxes fa-3x text-success mb-3"></i>
                         <h5 class="card-title">Gestión de Productos</h5>
@@ -412,11 +354,11 @@ if (!$filtro_activo) {
                 </a>
             </div>
             <div class="col-md-4">
-                <a href="#" class="text-decoration-none">
+                <a href="admin_reporte_ventas.php" class="text-decoration-none">
                     <div class="card text-center p-4 h-100 shadow-sm bg-light">
                         <i class="fas fa-chart-bar fa-3x text-danger mb-3"></i>
                         <h5 class="card-title">Reportes Financieros</h5>
-                        <p class="card-text text-muted">Consultar ventas, ingresos y transacciones.</p>
+                        <p class="card-text text-muted">Gestión de Proveedores, Detalle del Proveedor y Historial de Ingresos.</p>
                     </div>
                 </a>
             </div>

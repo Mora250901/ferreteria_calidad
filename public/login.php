@@ -11,7 +11,7 @@ if (isset($_SESSION['autenticado'])) {
     }
 
     if ($rol == 'admin') {
-        header("Location: ../admin/admin_dashboard.php");
+        header("Location: ../admin/admin_dashboard_general.php");
     } elseif ($rol == 'logistico') {
         header("Location: ../logistico/logistico_dashboard.php");
     } else {
@@ -52,7 +52,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             $_SESSION['usuario_data'] = $usuario_data;
 
             if ($usuario_data['rol'] == 'admin') {
-                header("Location: ../admin/admin_dashboard.php");
+                header("Location: ../admin/admin_dashboard_general.php");
             } elseif ($usuario_data['rol'] == 'logistico') {
                 header("Location: ../logistico/logistico_dashboard.php");
             } else {

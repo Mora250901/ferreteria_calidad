@@ -40,21 +40,49 @@ if (isset($_GET['action']) && isset($_GET['id'])) {
         $stmt_update->execute();
 
         // Redirigir para limpiar los parámetros GET de la URL
-        header("Location: admin_dashboard.php?msg=" . $action);
+        // IMPORTANTE: Mantiene el término de búsqueda si existe para no perder el contexto del filtro
+        $redirect_url = "admin_dashboard.php?msg=" . $action;
+        if (isset($_GET['search'])) {
+            $redirect_url .= "&search=" . urlencode($_GET['search']);
+        }
+        header("Location: " . $redirect_url);
         exit();
     }
 }
 
 // ==========================================================
-// 3. CONSULTA DE USUARIOS LOGÍSTICOS
+// 3. CONSULTA DE USUARIOS LOGÍSTICOS CON FILTRO DE BÚSQUEDA
 // ==========================================================
 
-// Consulta para obtener todos los usuarios logísticos.
+// Inicializar variables de búsqueda
+$search_term = '';
+$search_query = '';
+
+if (isset($_GET['search']) && !empty(trim($_GET['search']))) {
+    $search_term = trim($_GET['search']);
+    // Añadir la condición de búsqueda para el campo 'usuario'
+    $search_query = " AND usuario LIKE ?"; 
+    // Usamos LIKE y comodines para buscar coincidencias parciales
+    $param_search = "%" . $search_term . "%"; 
+}
+
+
+// Consulta base para obtener todos los usuarios logísticos.
 $sql = "SELECT id_usuario, usuario, email, telefono, estado, fecha_registro
          FROM usuarios
-         WHERE rol = 'logistico'
-         ORDER BY estado ASC, fecha_registro DESC"; // Ordena por estado para agrupar suspendidos
-$result = $conn->query($sql);
+         WHERE rol = 'logistico'" . $search_query . "
+         ORDER BY estado ASC, fecha_registro DESC"; 
+
+// Preparar y ejecutar la consulta
+$stmt = $conn->prepare($sql);
+
+if (!empty($search_query)) {
+    // Vincular el parámetro de búsqueda si existe
+    $stmt->bind_param("s", $param_search); 
+}
+
+$stmt->execute();
+$result = $stmt->get_result();
 
 ?>
 
@@ -94,7 +122,11 @@ $result = $conn->query($sql);
             color: #fff;
             background-color: #495057; 
         }
-        
+        .sidebar .active-link {
+            background-color: #495057;
+            color: #fff;
+            font-weight: bold;
+        }
         .main-content {
             margin-left: 250px; /* Offset para el sidebar */
             padding: 20px;
@@ -118,20 +150,16 @@ $result = $conn->query($sql);
         <p class="text-secondary text-center">Bienvenido, <?php echo htmlspecialchars($_SESSION['usuario_data']['usuario'] ?? 'Admin'); ?></p>
         <hr class="text-white-50">
         <ul class="list-unstyled components">
-            <li><a href="admin_dashboard_general.php"><i class="fas fa-tachometer-alt me-2"></i> Dashboard General</a></li>
-            
-            <li><a href="admin_dashboard.php" class="bg-secondary text-white fw-bold"><i class="fas fa-truck me-2"></i>Gestión Logístico</a></li>
-            
             <li>
-                <a href="admin_registrar_logistico.php" class="add-link-style">
-                    <i class="fas fa-user-plus me-2"></i> Agregar Nuevo Logístico
+                <a href="admin_dashboard_general.php" > ⚖ Dashboard General
                 </a>
             </li>
             
-            <hr class="text-white-50">
+            <li><a href="admin_dashboard.php" class="active-link">  🔑 Gestión Logístico</a></li>
+            <li><a href="admin_registrar_logistico.php">📥 Agregar Nuevo Logístico</a></li>
+            <li><a href="admin_proveedores.php">👨🏽‍🤝‍👨🏻 Proveedores</a></li>          
 
-            <li><a href="#"><i class="fas fa-boxes me-2"></i> Gestión de Productos</a></li>
-            <li><a href="#"><i class="fas fa-chart-line me-2"></i> Reportes de Ventas</a></li>
+            <li><a href="admin_reporte_ventas.php">📊 Reportes de Ventas</a></li>
             
             <li class="mt-5"><a href="../public/logout.php" class="btn btn-danger btn-sm w-100"><i class="fas fa-sign-out-alt me-2"></i> Cerrar Sesión</a></li>
         </ul>
@@ -157,6 +185,23 @@ $result = $conn->query($sql);
         }
         ?>
 
+        <form class="row row-cols-lg-auto g-3 align-items-center mb-4" method="GET" action="admin_dashboard.php">
+            <div class="col-12">
+                <label class="visually-hidden" for="inlineFormInputGroupUsername">Nombre</label>
+                <div class="input-group">
+                    <div class="input-group-text"><i class="fas fa-search"></i></div>
+                    <input type="text" class="form-control" id="inlineFormInputGroupUsername" 
+                           placeholder="Buscar por Nombre de Logístico" name="search"
+                           value="<?php echo htmlspecialchars($search_term); ?>">
+                </div>
+            </div>
+            <div class="col-12">
+                <button type="submit" class="btn btn-primary">Buscar</button>
+                <?php if (!empty($search_term)): ?>
+                    <a href="admin_dashboard.php" class="btn btn-secondary">Limpiar Filtro</a>
+                <?php endif; ?>
+            </div>
+        </form>
         <div class="card shadow">
             <div class="card-header bg-primary text-white">
                 Lista de Personal de Logística
@@ -180,6 +225,8 @@ $result = $conn->query($sql);
                             while ($row = $result->fetch_assoc()) { 
                                 // Determinar la clase del badge
                                 $estado_class = 'status-' . strtolower($row['estado']);
+                                // Codificar el término de búsqueda para mantenerlo en los enlaces de acción
+                                $current_search = !empty($search_term) ? "&search=" . urlencode($search_term) : "";
                                 ?>
                                 <tr>
                                     <td><?php echo $row['id_usuario']; ?></td>
@@ -190,24 +237,24 @@ $result = $conn->query($sql);
                                     <td><span class="status-badge <?php echo $estado_class; ?>"><?php echo ucfirst($row['estado']); ?></span></td>
                                     <td>
                                         <?php if ($row['estado'] === 'activo'): ?>
-                                            <a href="?action=suspender&id=<?php echo $row['id_usuario']; ?>" 
-                                               class="btn btn-warning btn-sm" 
-                                               onclick="return confirm('¿Seguro que deseas suspender a este usuario?');">Suspender</a>
+                                            <a href="?action=suspender&id=<?php echo $row['id_usuario'] . $current_search; ?>" 
+                                                class="btn btn-warning btn-sm" 
+                                                onclick="return confirm('¿Seguro que deseas suspender a este usuario?');">Suspender</a>
                                         <?php elseif ($row['estado'] === 'suspendido'): ?>
-                                            <a href="?action=activar&id=<?php echo $row['id_usuario']; ?>" 
-                                               class="btn btn-success btn-sm">Activar</a>
+                                            <a href="?action=activar&id=<?php echo $row['id_usuario'] . $current_search; ?>" 
+                                                class="btn btn-success btn-sm">Activar</a>
                                         <?php endif; ?>
 
                                         <?php if ($row['estado'] !== 'eliminado'): ?>
-                                            <a href="?action=eliminar&id=<?php echo $row['id_usuario']; ?>" 
-                                               class="btn btn-danger btn-sm" 
-                                               onclick="return confirm('ATENCIÓN: ¿Seguro que deseas ELIMINAR logicamente a este usuario?');">Eliminar</a>
+                                            <a href="?action=eliminar&id=<?php echo $row['id_usuario'] . $current_search; ?>" 
+                                                class="btn btn-danger btn-sm" 
+                                                onclick="return confirm('ATENCIÓN: ¿Seguro que deseas ELIMINAR logicamente a este usuario?');">Eliminar</a>
                                         <?php endif; ?>
                                     </td>
                                 </tr>
                             <?php }
                         } else {
-                            echo '<tr><td colspan="7" class="text-center">No hay usuarios logísticos registrados.</td></tr>';
+                            echo '<tr><td colspan="7" class="text-center">No se encontraron usuarios logísticos' . (!empty($search_term) ? ' con el nombre: <strong>' . htmlspecialchars($search_term) . '</strong>' : '') . '.</td></tr>';
                         }
                         ?>
                     </tbody>
