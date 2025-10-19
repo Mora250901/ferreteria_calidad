@@ -25,7 +25,7 @@ $resultCategorias = $conn->query($sqlCategorias);
         <div class="collapse navbar-collapse" id="navbarNav">
             <ul class="navbar-nav ms-auto">
                 <li class="nav-item"><a class="nav-link active" href="index_home.php">Inicio</a></li>
-                <li class="nav-item"><a class="nav-link" href="compras.php">Mis Compras</a></li>
+                <li class="nav-item"><a class="nav-link" href="mis_compras.php">Mis Compras</a></li>
                 <li class="nav-item"><a class="nav-link" href="carrito.php">Carrito</a></li>
 
                 <!-- Dropdown dinámico de categorías -->

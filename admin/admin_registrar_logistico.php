@@ -195,21 +195,18 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         <p class="text-secondary text-center">Bienvenido, <?php echo htmlspecialchars($_SESSION['usuario_data']['usuario'] ?? 'Admin'); ?></p>
         <hr class="text-white-50">
         <ul class="list-unstyled components">
-            <li><a href="admin_dashboard_general.php"><i class="fas fa-tachometer-alt me-2"></i>Dashboard General</a></li>
-            
-            <li><a href="admin_dashboard.php">Gestión Logístico</a></li>
-            
             <li>
-                <a href="admin_registrar_logistico.php" class="active-link add-link-style">Agregar Nuevo Logístico
+                <a href="admin_dashboard_general.php" > ⚖ Dashboard General
                 </a>
             </li>
             
-            <hr class="text-white-50">
+            <li><a href="admin_dashboard.php">  🔑 Gestión Logístico</a></li>
+            <li><a href="admin_registrar_logistico.php" class="active-link">📥 Agregar Nuevo Logístico</a></li>
+            <li><a href="admin_proveedores.php" >👨🏽‍🤝‍👨🏻 Proveedores</a></li>            
 
-            <li><a href="#">Gestión de Productos</a></li>
-            <li><a href="#">Reportes de Ventas</a></li>
+            <li><a href="admin_reporte_ventas.php" >📊 Reportes de Ventas</a></li>
             
-            <li class="mt-5"><a href="../public/logout.php" class="btn btn-danger btn-sm w-100">Cerrar Sesión</a></li>
+            <li class="mt-5"><a href="../public/logout.php" class="btn btn-danger btn-sm w-100"><i class="fas fa-sign-out-alt me-2"></i> Cerrar Sesión</a></li>
         </ul>
     </div>
     
