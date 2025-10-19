@@ -52,7 +52,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     if ($_POST['action'] === 'get_atributos_producto' && isset($_POST['id_catalogo'])) {
         $id_catalogo = (int)$_POST['id_catalogo'];
         
-        $sqlProducto = "SELECT cp.*, c.nombre_categoria, a.nombre_atributo, 
+        $sqlProducto = "SELECT cp.*, cp.id_categoria, c.nombre_categoria, a.nombre_atributo, 
                                GROUP_CONCAT(DISTINCT 
                                    CASE 
                                        WHEN cpa.valor_texto IS NOT NULL THEN cpa.valor_texto
@@ -84,7 +84,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     'nombre_producto' => $row['nombre_producto'],
                     'marca' => $row['marca'],
                     'precio_compra' => $row['precio_compra'],
-                    'categoria' => $row['nombre_categoria']
+                    'categoria' => $row['nombre_categoria'],
+                    'id_categoria' => (int)$row['id_categoria']
                 ];
             }
             
@@ -95,7 +96,55 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 ];
             }
         }
-        
+        $st->close();
+
+        // Buscar si ya existe un producto y calcular stock TOTAL
+        $producto_stock = 0;
+        if ($producto) {
+            $sqlExist = "SELECT p.id_producto, p.stock,
+                                COALESCE((
+                                    SELECT SUM(cip.cantidad) 
+                                    FROM catalogo_ingresos_pending cip 
+                                    INNER JOIN catalogo_proveedor cp ON cip.id_catalogo = cp.id_catalogo 
+                                    WHERE cp.nombre_producto = p.nombre_producto AND cp.id_categoria = p.id_categoria
+                                ), 0) AS stock_pendiente,
+                                COALESCE((
+                                    SELECT SUM(dc.cantidad) 
+                                    FROM detalle_compras dc 
+                                    WHERE dc.id_producto = p.id_producto
+                                ), 0) AS stock_compras
+                        FROM productos p 
+                        WHERE p.nombre_producto = ? AND p.id_categoria = ? 
+                        LIMIT 1";
+            $stEx = $conn->prepare($sqlExist);
+            $stEx->bind_param("si", $producto['nombre_producto'], $producto['id_categoria']);
+            $stEx->execute();
+            $resEx = $stEx->get_result();
+            
+            if ($rEx = $resEx->fetch_assoc()) {
+                // Producto EXISTE: sumar todo
+                $producto['id_producto'] = (int)$rEx['id_producto'];
+                $producto_stock = (int)$rEx['stock'] + (int)$rEx['stock_pendiente'] + (int)$rEx['stock_compras'];
+            } else {
+                // Producto NO EXISTE: solo sumar pendientes de este catálogo
+                $sqlPendientes = "SELECT COALESCE(SUM(cip.cantidad), 0) AS total_pendientes 
+                                  FROM catalogo_ingresos_pending cip 
+                                  WHERE cip.id_catalogo = ?";
+                $stPen = $conn->prepare($sqlPendientes);
+                $stPen->bind_param("i", $id_catalogo);
+                $stPen->execute();
+                $resPen = $stPen->get_result();
+                if ($rPen = $resPen->fetch_assoc()) {
+                    $producto_stock = (int)$rPen['total_pendientes'];
+                }
+                $stPen->close();
+            }
+            $stEx->close();
+        }
+
+        // añadir stock al response
+        if ($producto) $producto['stock'] = $producto_stock;
+
         echo json_encode(['status'=>'ok', 'producto'=>$producto, 'atributos'=>$atributos]);
         exit;
     }
@@ -174,7 +223,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $precio_compra = floatval($_POST['precio_compra'] ?? 0);
             $stProv->bind_param("iid", $id_producto, $id_proveedor, $precio_compra);
             $stProv->execute();
-            
+
+            // --- APLICAR INGRESOS PENDIENTES por id_catalogo (si existen) ---
+            if (!empty($id_catalogo)) {
+                $sqlPend = "SELECT id_pending, cantidad FROM catalogo_ingresos_pending WHERE id_catalogo = ? ORDER BY fecha ASC";
+                $stp = $conn->prepare($sqlPend);
+                $stp->bind_param("i", $id_catalogo);
+                $stp->execute();
+                $resPend = $stp->get_result();
+                $pendings = $resPend->fetch_all(MYSQLI_ASSOC);
+                $stp->close();
+
+                if (!empty($pendings)) {
+                    $insA = $conn->prepare("INSERT INTO ajustes_inventario (id_producto, cantidad, motivo, id_usuario) VALUES (?, ?, ?, ?)");
+                    $motivo = "Ingreso pendiente aplicado desde catálogo (id_catalogo ".$id_catalogo.")";
+                    $uid = (int)($u['id_usuario'] ?? 0);
+                    foreach ($pendings as $pd) {
+                        $cant = (int)$pd['cantidad'];
+                        if ($cant === 0) continue;
+                        $insA->bind_param("iisi", $id_producto, $cant, $motivo, $uid);
+                        $insA->execute();
+                        // El trigger trg_ajustes_inventario_insert incrementará stock
+                        $conn->query("DELETE FROM catalogo_ingresos_pending WHERE id_pending = ".intval($pd['id_pending']));
+                    }
+                    $insA->close();
+                }
+            }
+            // --- FIN APLICAR PENDIENTES ---
+
             if (isset($_POST['atributos']) && is_array($_POST['atributos'])) {
                 foreach ($_POST['atributos'] as $nombre_atributo => $valor_seleccionado) {
                     $sqlAttr = "SELECT id_atributo FROM atributos WHERE nombre_atributo = ?";
@@ -297,7 +373,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         $nombre      = str($_POST['nombre'] ?? '');
         $descripcion = str($_POST['descripcion'] ?? '');
         $precio      = max(0, floatval($_POST['precio_venta'] ?? 0));
-        $stock       = max(0, intval($_POST['stock'] ?? 0));
+        // stock intentionally ignored: stock must be managed via compras/ajustes
         $sku         = str($_POST['sku'] ?? '');
         $id_categoria = !empty($_POST['id_categoria']) ? (int)$_POST['id_categoria'] : null;
         $activo      = isset($_POST['activo']) ? b($_POST['activo']) : 1;
@@ -343,15 +419,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         }
 
         $sql = "UPDATE productos 
-                SET nombre_producto=?, descripcion=?, precio=?, stock=?, sku=?, id_categoria=?, activo=?, imagen_principal=?
+                SET nombre_producto=?, descripcion=?, precio=?, sku=?, id_categoria=?, activo=?, imagen_principal=?
                 WHERE id_producto=?";
         $st = $conn->prepare($sql);
-        $st->bind_param("ssdisiisi", $nombre, $descripcion, $precio, $stock, $sku, $id_categoria, $activo, $rutaDB, $id_producto);
+        $st->bind_param("ssdsiisi", $nombre, $descripcion, $precio, $sku, $id_categoria, $activo, $rutaDB, $id_producto);
         $ok = $st->execute();
 
         echo json_encode([
             'status' => $ok ? 'ok' : 'error',
-            'message' => $ok ? 'Producto actualizado correctamente' : 'Error al actualizar'
+            'message' => $ok ? 'Producto actualizado correctamente (stock no modificado aquí)' : 'Error al actualizar'
         ]);
         exit;
     }
@@ -559,10 +635,14 @@ body.oscuro .paso-header { background: #343a40; }
                 <label class="form-label">Precio de venta *</label>
                 <input type="number" step="0.01" name="precio_venta" class="form-control" required value="0">
               </div>
+
+              <!-- Stock mostrado como readonly y enviado en hidden (no editable) -->
               <div class="col-md-6">
-                <label class="form-label">Stock *</label>
-                <input type="number" name="stock" class="form-control" required value="0">
+                <label class="form-label">Stock</label>
+                <input type="text" id="display_stock" class="form-control" disabled value="0">
+                <input type="hidden" name="stock" id="form_stock" value="0">
               </div>
+
               <div class="col-md-6">
                 <label class="form-label">SKU</label>
                 <input type="text" name="sku" class="form-control" placeholder="Código único del producto">
@@ -590,6 +670,7 @@ body.oscuro .paso-header { background: #343a40; }
   </div>
 </div>
 
+<!-- Modal Editar / Ver etc (sin cambios en stock editable en edición) -->
 <div class="modal fade" id="modalEditar" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-lg modal-dialog-scrollable">
     <div class="modal-content">
@@ -621,8 +702,8 @@ body.oscuro .paso-header { background: #343a40; }
               <input type="number" step="0.01" name="precio_venta" id="edit_precio" class="form-control" required>
             </div>
             <div class="col-md-4">
-              <label class="form-label">Stock *</label>
-              <input type="number" name="stock" id="edit_stock" class="form-control" required>
+              <label class="form-label">Stock</label>
+              <input type="number" id="edit_stock" class="form-control" disabled>
             </div>
             <div class="col-md-4">
               <label class="form-label">SKU</label>
@@ -669,6 +750,7 @@ body.oscuro .paso-header { background: #343a40; }
     </div>
   </div>
 </div>
+
 <div class="modal fade" id="modalVerDetalles" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-lg">
     <div class="modal-content">
@@ -849,8 +931,6 @@ document.getElementById('btnSiguiente1').addEventListener('click', function() {
     });
 });
 
-// ...línea 848...
-
 // Paso 2: Selección de proveedor
 document.getElementById('btnSiguiente2').addEventListener('click', function() {
   const proveedorId = document.getElementById('selectProveedor').value;
@@ -914,7 +994,14 @@ document.getElementById('btnSiguiente3').addEventListener('click', function() {
         document.getElementById('infoProducto').style.display = 'block';
         document.getElementById('nombreProducto').textContent = j.producto.nombre_producto;
         document.getElementById('marcaProducto').textContent = 'Marca: ' + j.producto.marca;
-        document.getElementById('precioCompraProducto').textContent = 'Precio compra: S/ ' + parseFloat(j.producto.precio_compra).toFixed(2);
+        document.getElementById('precioCompraProducto').textContent = 'Precio compra: S/ ' + parseFloat(j.producto.precio_compra || 0).toFixed(2);
+
+        // Mostrar stock (readonly) y asignar hidden
+        const stockVal = (j.producto && typeof j.producto.stock !== 'undefined') ? parseInt(j.producto.stock, 10) : 0;
+        const displayStock = document.getElementById('display_stock');
+        const formStock = document.getElementById('form_stock');
+        if (displayStock) displayStock.value = stockVal;
+        if (formStock) formStock.value = stockVal;
 
         // Mostrar atributos
         const spinners = document.getElementById('spinnersAtributos');
@@ -924,7 +1011,7 @@ document.getElementById('btnSiguiente3').addEventListener('click', function() {
           spinners.innerHTML = '<div class="alert alert-info">Este producto no tiene atributos configurables.</div>';
         } else {
           atributosDisponibles.forEach(attr => {
-            const valores = attr.valores.map(v => `<option value="${v}">${v}</option>`).join('');
+            const valores = attr.valores && Array.isArray(attr.valores) ? attr.valores.map(v => `<option value="${v}">${v}</option>`).join('') : '';
             spinners.innerHTML += `
               <div class="atributo-spinner mb-2">
                 <h6>${attr.nombre}</h6>
@@ -1130,13 +1217,17 @@ $(document).on('click', '.btn-eliminar', function() {
     });
 });
 
-// Resetear modal al cerrar
+// Resetear modal al cerrar: limpiar display stock y hidden
 $('#modalCrear').on('hidden.bs.modal', function () {
   document.getElementById('formCrear').reset();
   document.getElementById('infoProducto').style.display = 'none';
   document.getElementById('spinnersAtributos').innerHTML = '<div class="alert alert-info">Selecciona un producto para ver sus atributos disponibles.</div>';
   cambiarPaso('paso5', 'paso1');
   document.getElementById('alertCrear').innerHTML = '';
+
+  // reset stock display/hidden
+  if (document.getElementById('display_stock')) document.getElementById('display_stock').value = '0';
+  if (document.getElementById('form_stock')) document.getElementById('form_stock').value = '0';
 });
 </script>
 </body>

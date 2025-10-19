@@ -9,14 +9,16 @@
    ===================== */
 CREATE TABLE usuarios (
     id_usuario INT AUTO_INCREMENT PRIMARY KEY,
-    nombre VARCHAR(100) NOT NULL,
-    DNI VARCHAR(20) NOT NULL,
+    usuario VARCHAR(100) NOT NULL,
+    documento VARCHAR(20) NOT NULL,
     email VARCHAR(150) NOT NULL UNIQUE,
-    password VARCHAR(255) NOT NULL,
+    contrasena VARCHAR(255) NOT NULL,   
     rol ENUM('cliente','admin','logistico') NOT NULL DEFAULT 'cliente',
     telefono VARCHAR(20) NOT NULL,
     direccion TEXT NOT NULL,
-    fecha_registro TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    fecha_registro TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    tipo_documento enum('DNI','C.E') NOT NULL DEFAULT 'DNI',
+    estado ENUM('activo','suspendido','eliminado') NOT NULL DEFAULT 'activo'
 ) ENGINE=InnoDB;
 
 -- =====================
@@ -86,6 +88,28 @@ CREATE TABLE proveedor_categoria (
     FOREIGN KEY (id_categoria) REFERENCES categorias(id_categoria) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
+CREATE TABLE catalogo_ingresos_pending (
+    id_pending INT AUTO_INCREMENT PRIMARY KEY,
+    id_catalogo INT NOT NULL,
+    cantidad INT NOT NULL,
+    precio_compra DECIMAL(10,2) NOT NULL,
+    id_usuario INT NULL,
+    fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    comentario VARCHAR(255),
+    FOREIGN KEY (id_catalogo) REFERENCES catalogo_proveedor(id_catalogo) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+-- =====================
+-- ATRIBUTOS DINÁMICOS
+-- =====================
+-- atributos: lista de posibles atributos (ej: Color, Diametro, Litros)
+CREATE TABLE atributos (
+    id_atributo INT AUTO_INCREMENT PRIMARY KEY,
+    nombre_atributo VARCHAR(150) NOT NULL,
+    tipo_atributo ENUM('texto','numero','decimal','booleano','fecha') NOT NULL DEFAULT 'texto'
+) ENGINE=InnoDB;
+
+
 CREATE TABLE catalogo_proveedor (
     id_catalogo INT AUTO_INCREMENT PRIMARY KEY,
     id_proveedor INT NOT NULL,
@@ -111,16 +135,6 @@ CREATE TABLE catalogo_proveedor_atributos (
     PRIMARY KEY (id_catalogo, id_atributo),
     FOREIGN KEY (id_catalogo) REFERENCES catalogo_proveedor(id_catalogo) ON DELETE CASCADE,
     FOREIGN KEY (id_atributo) REFERENCES atributos(id_atributo) ON DELETE CASCADE
-) ENGINE=InnoDB;
-
--- =====================
--- ATRIBUTOS DINÁMICOS
--- =====================
--- atributos: lista de posibles atributos (ej: Color, Diametro, Litros)
-CREATE TABLE atributos (
-    id_atributo INT AUTO_INCREMENT PRIMARY KEY,
-    nombre_atributo VARCHAR(150) NOT NULL,
-    tipo_atributo ENUM('texto','numero','decimal','booleano','fecha') NOT NULL DEFAULT 'texto'
 ) ENGINE=InnoDB;
 
 -- categorias_atributos: liga categoria <-> atributo
@@ -311,6 +325,90 @@ CREATE TABLE configuraciones_usuario (
     FOREIGN KEY (id_usuario) REFERENCES usuarios(id_usuario) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
+-- Tabla de compras (cabecera)
+CREATE TABLE compras (
+    id_compra INT AUTO_INCREMENT PRIMARY KEY,
+    id_proveedor INT NOT NULL,
+    numero_factura VARCHAR(50) NOT NULL,
+    fecha_compra DATE NOT NULL,
+    total DECIMAL(10,2) DEFAULT 0,
+    metodo_pago ENUM('contado','credito') DEFAULT 'contado',
+    fecha_pago DATE NULL,
+    igv DECIMAL(5,2) DEFAULT 18.00;
+    FOREIGN KEY (id_proveedor) REFERENCES proveedores(id_proveedor)
+);
+
+-- Tabla de detalle de compras
+CREATE TABLE detalle_compras (
+    id_detalle INT AUTO_INCREMENT PRIMARY KEY,
+    id_compra INT NOT NULL,
+    id_producto INT NOT NULL,
+    cantidad INT NOT NULL,
+    precio_unitario DECIMAL(10,2) NOT NULL,
+    subtotal DECIMAL(10,2) GENERATED ALWAYS AS (cantidad * precio_unitario) STORED,
+    FOREIGN KEY (id_compra) REFERENCES compras(id_compra) ON DELETE CASCADE,
+    FOREIGN KEY (id_producto) REFERENCES productos(id_producto)
+);
+
+CREATE TABLE ajustes_inventario (
+    id_ajuste INT AUTO_INCREMENT PRIMARY KEY,
+    id_producto INT NOT NULL,
+    cantidad INT NOT NULL, -- positivo = entrada, negativo = salida
+    motivo VARCHAR(255) NOT NULL,
+    fecha_ajuste TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    id_usuario INT NOT NULL,
+    FOREIGN KEY (id_producto) REFERENCES productos(id_producto),
+    FOREIGN KEY (id_usuario) REFERENCES usuarios(id_usuario)
+);
+
+-- 1. Nueva tabla para ingresos de inventario
+CREATE TABLE ingresos_inventario (
+    id_ingreso INT AUTO_INCREMENT PRIMARY KEY,
+    numero_factura VARCHAR(50) NOT NULL,
+    fecha_ingreso DATE NOT NULL,
+    fecha_emision DATE NOT NULL,
+    metodo_pago ENUM('contado','credito') DEFAULT 'contado',
+    dias_credito INT DEFAULT 0,
+    fecha_pago DATE NULL,
+    subtotal DECIMAL(10,2) DEFAULT 0,
+    igv DECIMAL(5,2) DEFAULT 18.00,
+    total DECIMAL(10,2) DEFAULT 0,
+    observaciones TEXT,
+    id_usuario INT NOT NULL,
+    fecha_registro TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (id_usuario) REFERENCES usuarios(id_usuario)
+);
+
+-- 2. Nueva tabla para detalle de ingresos
+CREATE TABLE ingreso_inventario_detalle (
+    id_detalle INT AUTO_INCREMENT PRIMARY KEY,
+    id_ingreso INT NOT NULL,
+    id_proveedor INT NOT NULL,
+    id_categoria INT NOT NULL,
+    nombre_producto VARCHAR(200) NOT NULL,
+    marca VARCHAR(150),
+    precio_compra DECIMAL(10,2) NOT NULL,
+    cantidad INT NOT NULL,
+    subtotal_detalle DECIMAL(10,2) GENERATED ALWAYS AS (cantidad * precio_compra) STORED,
+    FOREIGN KEY (id_ingreso) REFERENCES ingresos_inventario(id_ingreso) ON DELETE CASCADE,
+    FOREIGN KEY (id_proveedor) REFERENCES proveedores(id_proveedor),
+    FOREIGN KEY (id_categoria) REFERENCES categorias(id_categoria)
+);
+
+-- 3. Nueva tabla para atributos del detalle
+CREATE TABLE ingreso_detalle_atributos (
+    id_detalle INT NOT NULL,
+    id_atributo INT NOT NULL,
+    valor_texto VARCHAR(255),
+    valor_numero INT,
+    valor_decimal DECIMAL(18,6),
+    valor_booleano BOOLEAN,
+    valor_fecha DATE,
+    PRIMARY KEY (id_detalle, id_atributo),
+    FOREIGN KEY (id_detalle) REFERENCES ingreso_inventario_detalle(id_detalle) ON DELETE CASCADE,
+    FOREIGN KEY (id_atributo) REFERENCES atributos(id_atributo) ON DELETE CASCADE
+);
+
 -- =====================
 -- ÍNDICES ÚTILES (ejemplos)
 -- =====================
@@ -365,6 +463,28 @@ BEGIN
         INSERT INTO historico_precios (id_producto, precio_anterior, precio_nuevo, id_usuario_modifico)
         VALUES (OLD.id_producto, OLD.precio, NEW.precio, NULL);
     END IF;
+END$$
+
+DELIMITER ;
+
+DELIMITER $$
+
+CREATE TRIGGER trg_detalle_compras_insert
+AFTER INSERT ON detalle_compras
+FOR EACH ROW
+BEGIN
+    UPDATE productos
+    SET stock = stock + NEW.cantidad
+    WHERE id_producto = NEW.id_producto;
+END$$
+
+CREATE TRIGGER trg_ajustes_inventario_insert
+AFTER INSERT ON ajustes_inventario
+FOR EACH ROW
+BEGIN
+    UPDATE productos
+    SET stock = stock + NEW.cantidad
+    WHERE id_producto = NEW.id_producto;
 END$$
 
 DELIMITER ;
