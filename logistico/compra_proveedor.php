@@ -19,6 +19,7 @@ function str($s){ return trim((string)$s); }
 // --------------------
 // Procesar formulario de nueva compra
 // --------------------
+<<<<<<< Updated upstream
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Si viene como JSON
     if (isset($_POST['data'])) {
@@ -102,6 +103,83 @@ error_log("DEBUG: productos_post count = " . count($productos_post));
         }
         exit;
     }
+=======
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'registrar_compra') {
+    // datos básicos de la compra
+    $id_proveedor = (int)($_POST['id_proveedor'] ?? 0);
+    $numero_factura = trim($_POST['numero_factura'] ?? '');
+    $fecha_compra = $_POST['fecha_compra'] ?? date('Y-m-d');
+    $productos_post = $_POST['productos'] ?? [];
+
+    if (!$id_proveedor || !$numero_factura || !is_array($productos_post) || empty($productos_post)) {
+        echo json_encode(['status'=>'error','message'=>'Datos incompletos']);
+        exit;
+    }
+
+    // Mapear id_catalogo -> id_producto (verificar existencia)
+    $mapCatalogoToProducto = [];
+    $missing = [];
+    $sqlMap = "SELECT p.id_producto
+               FROM catalogo_proveedor cp
+               LEFT JOIN productos p ON p.nombre_producto = cp.nombre_producto AND p.id_categoria = cp.id_categoria
+               WHERE cp.id_catalogo = ? LIMIT 1";
+    $stMap = $conn->prepare($sqlMap);
+
+    foreach ($productos_post as $id_catalogo_str => $it) {
+        $id_catalogo = (int)$id_catalogo_str;
+        $stMap->bind_param("i", $id_catalogo);
+        $stMap->execute();
+        $r = $stMap->get_result()->fetch_assoc();
+        if (!$r || empty($r['id_producto'])) {
+            $missing[] = $id_catalogo;
+            continue;
+        }
+        $mapCatalogoToProducto[$id_catalogo] = (int)$r['id_producto'];
+    }
+    $stMap->close();
+
+    if (!empty($missing)) {
+        echo json_encode(['status'=>'error','message'=>'La compra no puede registrarse porque faltan productos en inventario: Catálogo #' . implode(', #', $missing)]);
+        exit;
+    }
+
+    // Insertar compra + detalle; NO actualizar stock manualmente (trigger se encarga)
+    $conn->begin_transaction();
+    try {
+        $insC = $conn->prepare("INSERT INTO compras (id_proveedor, numero_factura, fecha_compra, total) VALUES (?, ?, ?, ?)");
+        $total = 0;
+        // calcular total provisional
+        foreach ($productos_post as $id_catalogo_str => $it) {
+            $cantidad = max(0, intval($it['cantidad'] ?? 0));
+            $precio = max(0, floatval($it['precio'] ?? 0));
+            $total += $cantidad * $precio;
+        }
+        $insC->bind_param("issd", $id_proveedor, $numero_factura, $fecha_compra, $total);
+        $insC->execute();
+        $id_compra = $conn->insert_id;
+        $insC->close();
+
+        $stmtDetalle = $conn->prepare("INSERT INTO detalle_compras (id_compra, id_producto, cantidad, precio_unitario) VALUES (?, ?, ?, ?)");
+        foreach ($productos_post as $id_catalogo_str => $it) {
+            $id_catalogo = (int)$id_catalogo_str;
+            $id_producto = $mapCatalogoToProducto[$id_catalogo];
+            $cantidad = max(0, intval($it['cantidad'] ?? 0));
+            $precio_unitario = max(0, floatval($it['precio'] ?? 0));
+            if ($cantidad <= 0) continue;
+            $stmtDetalle->bind_param("iiid", $id_compra, $id_producto, $cantidad, $precio_unitario);
+            $stmtDetalle->execute();
+            // NO ejecutar UPDATE productos SET stock = stock + ... porque existe trigger trg_detalle_compras_insert
+        }
+        $stmtDetalle->close();
+
+        $conn->commit();
+        echo json_encode(['status'=>'ok','message'=>'Compra registrada correctamente']);
+    } catch (Exception $e) {
+        $conn->rollback();
+        echo json_encode(['status'=>'error','message'=>'Error registrando compra: '.$e->getMessage()]);
+    }
+    exit;
+>>>>>>> Stashed changes
 }
 
 // --------------------
@@ -128,6 +206,10 @@ $compras = $conn->query("
 <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
 <link href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css" rel="stylesheet">
 <style>
+<<<<<<< Updated upstream
+=======
+/* Mantengo tus estilos originales y completo algunos detalles */
+>>>>>>> Stashed changes
 body.claro { background:#f8f9fa; color:#212529; }
 body.oscuro { background:#212529; color:#f8f9fa; }
 .sidebar{ width:250px; position:fixed; top:0; bottom:0; left:0; padding-top:60px; z-index:1000; transition:.3s; }
@@ -142,12 +224,20 @@ body.oscuro { background:#212529; color:#f8f9fa; }
 .card{ border-radius:12px; }
 body.oscuro .card{ background:#2c3034; color:#f8f9fa; }
 .table-img{ width:48px; height:48px; object-fit:cover; border-radius:6px; border:1px solid rgba(0,0,0,.08);}
+<<<<<<< Updated upstream
+=======
+/* Extras UI */
+>>>>>>> Stashed changes
 .table thead th { vertical-align: middle; }
 .modal-lg { max-width: 900px; }
 </style>
 </head>
 <body class="<?= htmlspecialchars($tema_usuario) ?>">
 
+<<<<<<< Updated upstream
+=======
+<!-- Cambiado: añadir botón toggle + sidebar + wrapper main-content -->
+>>>>>>> Stashed changes
 <button class="btn btn-outline-primary d-lg-none toggle-btn" onclick="document.getElementById('sidebar').classList.toggle('show')">
   <i class="fas fa-bars"></i>
 </button>
@@ -158,6 +248,10 @@ body.oscuro .card{ background:#2c3034; color:#f8f9fa; }
     <div class="container py-4">
         <h2 class="mb-4">Compras a Proveedores</h2>
 
+<<<<<<< Updated upstream
+=======
+        <!-- Mensajes -->
+>>>>>>> Stashed changes
         <?php if(isset($_SESSION['msg'])): ?>
             <div class="alert alert-info alert-dismissible fade show">
                 <?= htmlspecialchars($_SESSION['msg']); unset($_SESSION['msg']); ?>
@@ -169,6 +263,10 @@ body.oscuro .card{ background:#2c3034; color:#f8f9fa; }
             <i class="fa fa-plus"></i> Registrar nueva compra
         </button>
 
+<<<<<<< Updated upstream
+=======
+    <!-- Tabla de compras -->
+>>>>>>> Stashed changes
     <div class="card">
         <div class="card-body">
             <table id="tablaCompras" class="table table-bordered table-striped">
@@ -205,6 +303,10 @@ body.oscuro .card{ background:#2c3034; color:#f8f9fa; }
   </div>
 </div>
 
+<<<<<<< Updated upstream
+=======
+<!-- Modal Nueva Compra -->
+>>>>>>> Stashed changes
 <div class="modal fade" id="modalAgregar" tabindex="-1">
     <div class="modal-dialog modal-lg">
         <form method="post" id="formNuevaCompra">
@@ -218,7 +320,11 @@ body.oscuro .card{ background:#2c3034; color:#f8f9fa; }
                     <div class="row g-3">
                         <div class="col-md-6">
                             <label class="form-label">Proveedor *</label>
+<<<<<<< Updated upstream
                             <select name="proveedor_id" id="id_proveedor" class="form-select" required>
+=======
+                            <select name="proveedor_id" id="proveedor_id" class="form-select" required>
+>>>>>>> Stashed changes
                                 <option value="">Seleccione proveedor...</option>
                                 <?php foreach($proveedores as $p): ?>
                                     <option value="<?= $p['id_proveedor'] ?>"><?= htmlspecialchars($p['nombre_proveedor']) ?></option>
@@ -259,7 +365,11 @@ $(document).ready(function(){
     $('#tablaCompras').DataTable();
 
     // Cargar productos según proveedor
+<<<<<<< Updated upstream
     $('#id_proveedor').change(function(){
+=======
+    $('#proveedor_id').change(function(){
+>>>>>>> Stashed changes
         const provId = $(this).val();
         if(!provId) {
             $('#productosContainer').html('<div class="text-muted small">Seleccione proveedor para cargar productos...</div>');
@@ -267,6 +377,7 @@ $(document).ready(function(){
         }
         $('#productosContainer').html('<div class="text-muted small">Cargando productos...</div>');
         $.getJSON('compra_proveedor_productos.php', { proveedor_id: provId }, function(res){
+<<<<<<< Updated upstream
             if(!res || res.status !== 'ok') {
                 $('#productosContainer').html('<div class="text-danger small">Error al cargar productos</div>');
                 return;
@@ -353,6 +464,44 @@ $('#formNuevaCompra').on('submit', function(e) {
     });
 });
 
+=======
+    if(!res || res.status !== 'ok') {
+        $('#productosContainer').html('<div class="text-danger small">Error al cargar productos</div>');
+        return;
+    }
+    const prods = res.data;
+    if(!prods.length) {
+        $('#productosContainer').html('<div class="text-muted small">No hay productos en catálogo para este proveedor.</div>');
+        return;
+    }
+    let html = '';
+    prods.forEach(p=>{
+        // usar id_catalogo como índice para que el servidor reciba productos[id_catalogo]
+        const idx = p.id_catalogo ?? p.id_catalogo; // aseguramos presencia
+        html += `
+        <div class="row g-2 mb-2">
+            <div class="col-md-6">
+                <input type="text" class="form-control" value="${p.nombre_producto}" disabled>
+                <input type="hidden" name="productos[${idx}][precio]" value="${p.precio_compra}">
+                <input type="hidden" name="productos[${idx}][id_catalogo]" value="${idx}">
+            </div>
+            <div class="col-md-3">
+                <input type="number" name="productos[${idx}][cantidad]" min="1" class="form-control" placeholder="Cantidad">
+            </div>
+            <div class="col-md-3">
+                <input type="number" class="form-control" value="${p.precio_compra}" disabled>
+            </div>
+        </div>`;
+    });
+    $('#productosContainer').html(html);
+    }).fail(function(jqxhr, textStatus, error){
+        console.error("Ajax error:", textStatus, error);
+        $('#productosContainer').html('<div class="text-danger small">Error de red</div>');
+    });
+    });
+
+    // Optional: limpieza al cerrar modal
+>>>>>>> Stashed changes
     $('#modalAgregar').on('hidden.bs.modal', function () {
         $('#formNuevaCompra')[0].reset();
         $('#productosContainer').html('<div class="text-muted small">Seleccione proveedor para cargar productos...</div>');

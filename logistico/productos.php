@@ -98,6 +98,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         }
         $st->close();
 
+<<<<<<< Updated upstream
         // Buscar si ya existe un producto y calcular stock TOTAL
         $producto_stock = 0;
         if ($producto) {
@@ -116,10 +117,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                         FROM productos p 
                         WHERE p.nombre_producto = ? AND p.id_categoria = ? 
                         LIMIT 1";
+=======
+        // Buscar si ya existe un producto en tabla productos con mismo nombre y categoría
+        $producto_stock = 0;
+        if ($producto) {
+            $sqlExist = "SELECT id_producto, stock FROM productos WHERE nombre_producto = ? AND id_categoria = ? LIMIT 1";
+>>>>>>> Stashed changes
             $stEx = $conn->prepare($sqlExist);
             $stEx->bind_param("si", $producto['nombre_producto'], $producto['id_categoria']);
             $stEx->execute();
             $resEx = $stEx->get_result();
+<<<<<<< Updated upstream
             
             if ($rEx = $resEx->fetch_assoc()) {
                 // Producto EXISTE: sumar todo
@@ -138,6 +146,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     $producto_stock = (int)$rPen['total_pendientes'];
                 }
                 $stPen->close();
+=======
+            if ($rEx = $resEx->fetch_assoc()) {
+                $producto['id_producto'] = (int)$rEx['id_producto'];
+                $producto_stock = (int)$rEx['stock'];
+>>>>>>> Stashed changes
             }
             $stEx->close();
         }
