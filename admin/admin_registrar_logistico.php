@@ -1,4 +1,5 @@
 <?php
+// admin_registrar_logistico.php - VERSIÓN CORREGIDA (SELECCIÓN DE ROL)
 session_start();
 include("../config/conexion.php");
 
@@ -22,9 +23,10 @@ $email = '';
 $telefono = '';
 $direccion = '';
 $tipo_documento = 'DNI';
+$rol_seleccionado = 'logistico'; // Nuevo valor por defecto para el rol
 
 // ==========================================================
-// 2. PROCESAMIENTO DEL FORMULARIO CON VALIDACIONES (SIN CAMBIOS)
+// 2. PROCESAMIENTO DEL FORMULARIO CON VALIDACIONES
 // ==========================================================
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
     // 2.1. Recolección de datos
@@ -37,11 +39,13 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $direccion = trim($_POST['direccion'] ?? '');
     $tipo_documento = $_POST['tipo_documento'] ?? 'DNI';
     
-    // El rol SIEMPRE es 'logistico' y el estado SIEMPRE es 'activo'
-    $rol = 'logistico';
+    // **CAMBIO CLAVE 1: Capturar el rol del formulario**
+    $rol_seleccionado = $_POST['rol'] ?? 'logistico'; 
+    
+    // El estado SIEMPRE es 'activo' para un nuevo registro
     $estado = 'activo';
 
-    // 2.2. Validaciones (Sin cambios en la lógica)
+    // 2.2. Validaciones 
     
     if (empty($usuario) || empty($documento) || empty($email) || empty($contrasena) || empty($confirmar_contrasena) || empty($telefono) || empty($direccion)) {
         $error_msg = "Todos los campos con (*) deben ser llenados.";
@@ -76,6 +80,11 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         $error_msg = "El Teléfono debe contener exactamente 9 dígitos numéricos.";
     } 
     
+    // **CAMBIO CLAVE 2: Validar el rol**
+    elseif ($rol_seleccionado !== 'logistico' && $rol_seleccionado !== 'admin') {
+        $error_msg = "Rol seleccionado inválido.";
+    }
+    
     else {
         // 2.3. Hashing de contraseña
         $contrasena_hash = password_hash($contrasena, PASSWORD_DEFAULT);
@@ -92,7 +101,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         } else {
             // 2.5. Inserción en la base de datos
             $sql_insert = "INSERT INTO usuarios (usuario, documento, email, contrasena, rol, telefono, direccion, tipo_documento, estado) 
-                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
             $stmt_insert = $conn->prepare($sql_insert);
             
             $stmt_insert->bind_param("sssssssss", 
@@ -100,7 +109,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 $documento, 
                 $email, 
                 $contrasena_hash, 
-                $rol, 
+                $rol_seleccionado, // Usar el rol seleccionado
                 $telefono, 
                 $direccion, 
                 $tipo_documento,
@@ -124,7 +133,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Registrar Logístico - Admin Panel</title>
+    <title>Registrar Personal - Admin Panel</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="../assets/css/styles.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
@@ -200,10 +209,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 </a>
             </li>
             
-            <li><a href="admin_dashboard.php">  🔑 Gestión Logístico</a></li>
+            <li><a href="admin_dashboard.php"> 🔑 Gestión Logístico</a></li>
             <li><a href="admin_registrar_logistico.php" class="active-link">📥 Agregar Nuevo Logístico</a></li>
-            <li><a href="admin_proveedores.php" >👨🏽‍🤝‍👨🏻 Proveedores</a></li>            
-
+            <li><a href="admin_proveedores.php" >👨🏽‍🤝‍👨🏻 Proveedores</a></li> 
             <li><a href="admin_reporte_ventas.php" >📊 Reportes de Ventas</a></li>
             
             <li class="mt-5"><a href="../public/logout.php" class="btn btn-danger btn-sm w-100"><i class="fas fa-sign-out-alt me-2"></i> Cerrar Sesión</a></li>
@@ -211,11 +219,11 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     </div>
     
     <div class="main-content flex-grow-1">
-        <h2 class="mb-4">Registro de Nuevo Personal Logístico</h2>
+        <h2 class="mb-4">Registro de Nuevo Personal</h2>
         
         <div class="card shadow">
             <div class="card-header card-header-blue">
-                <i class="fas fa-truck-moving me-2"></i> Registro de Datos del Nuevo Empleado
+                <i class="fas fa-user-plus me-2"></i> Registro de Datos del Nuevo Empleado
             </div>
             <div class="card-body">
                 
@@ -231,12 +239,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                         <div class="col-md-6">
                             <label for="usuario" class="form-label">Nombre de Usuario *</label>
                             <input type="text" class="form-control" id="usuario" name="usuario" required 
-                                   value="<?php echo htmlspecialchars($usuario); ?>">
+                                    value="<?php echo htmlspecialchars($usuario); ?>">
                         </div>
                         <div class="col-md-6">
                             <label for="email" class="form-label">Email *</label>
                             <input type="email" class="form-control" id="email" name="email" required
-                                   value="<?php echo htmlspecialchars($email); ?>">
+                                    value="<?php echo htmlspecialchars($email); ?>">
                         </div>
                     </div>
 
@@ -251,8 +259,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                         <div class="col-md-6">
                             <label for="documento" class="form-label">Número de Documento (DNI: 8 dígitos) *</label>
                             <input type="text" class="form-control" id="documento" name="documento" required 
-                                   maxlength="8" pattern="\d{8}" title="Debe contener 8 dígitos numéricos."
-                                   value="<?php echo htmlspecialchars($documento); ?>">
+                                    maxlength="8" pattern="\d{8}" title="Debe contener 8 dígitos numéricos."
+                                    value="<?php echo htmlspecialchars($documento); ?>">
                         </div>
                     </div>
 
@@ -260,8 +268,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                         <div class="col-md-6">
                             <label for="telefono" class="form-label">Teléfono (9 dígitos) *</label>
                             <input type="text" class="form-control" id="telefono" name="telefono" required 
-                                   maxlength="9" pattern="\d{9}" title="Debe contener 9 dígitos numéricos."
-                                   value="<?php echo htmlspecialchars($telefono); ?>">
+                                    maxlength="9" pattern="\d{9}" title="Debe contener 9 dígitos numéricos."
+                                    value="<?php echo htmlspecialchars($telefono); ?>">
                         </div>
                         <div class="col-md-6">
                             <label for="contrasena" class="form-label">Contraseña *</label>
@@ -269,9 +277,19 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                         </div>
                     </div>
                     
-                    <div class="mb-3">
-                        <label for="confirmar_contrasena" class="form-label">Confirmar Contraseña *</label>
-                        <input type="password" class="form-control" id="confirmar_contrasena" name="confirmar_contrasena" required>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="confirmar_contrasena" class="form-label">Confirmar Contraseña *</label>
+                            <input type="password" class="form-control" id="confirmar_contrasena" name="confirmar_contrasena" required>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <label for="rol" class="form-label">Rol del Usuario *</label>
+                            <select class="form-select" id="rol" name="rol" required>
+                                <option value="logistico" <?php echo ($rol_seleccionado === 'logistico') ? 'selected' : ''; ?>>Logístico</option>
+                                <option value="admin" <?php echo ($rol_seleccionado === 'admin') ? 'selected' : ''; ?>>Administrador</option>
+                            </select>
+                        </div>
                     </div>
 
                     <div class="mb-3">
@@ -280,7 +298,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     </div>
                     
                     <div class="d-grid gap-2">
-                        <button type="submit" class="btn btn-submit-blue mt-3"><i class="fas fa-check-circle me-2"></i> Registrar Logístico</button>
+                        <button type="submit" class="btn btn-submit-blue mt-3"><i class="fas fa-check-circle me-2"></i> Registrar Usuario</button>
                     </div>
                 </form>
                 
