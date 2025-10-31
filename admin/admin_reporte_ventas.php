@@ -1,5 +1,5 @@
 <?php
-// admin_reporte_ventas.php - VERSIÓN FINAL CORREGIDA
+// admin_reporte_ventas.php - VERSIÓN FINAL CORREGIDA con estética mejorada
 session_start();
 include("../config/conexion.php");
 
@@ -152,14 +152,14 @@ if ($dashboard_activo === 'productos') {
     $facturacion = array_map('floatval', array_column($datos_dashboard, 'total_facturado'));
     
     $etiquetas_js = json_encode($nombres_productos);
-    $datos_js = json_encode($cantidades);       // Cantidades para la barra
-    $datos_extra_js = json_encode($facturacion); // Facturación para el pastel
+    $datos_js = json_encode($cantidades); 
+    $datos_extra_js = json_encode($facturacion); 
 
 } elseif ($dashboard_activo === 'ventas') {
     $datos_dashboard = obtenerVentasPorPeriodo($conn, $fecha_inicio, $fecha_fin);
     // Preparar datos para Chart.js
     $etiquetas_js = json_encode($datos_dashboard['etiquetas'] ?? []);
-    $datos_js = json_encode($datos_dashboard['valores'] ?? []); // Valores de venta
+    $datos_js = json_encode($datos_dashboard['valores'] ?? []); 
 
 } elseif ($dashboard_activo === 'transacciones') {
     $datos_dashboard = obtenerRendimientoTransacciones($conn, $fecha_inicio, $fecha_fin);
@@ -168,7 +168,7 @@ if ($dashboard_activo === 'productos') {
     $montos = array_map('floatval', array_column($datos_dashboard, 'total_monto'));
     
     $etiquetas_js = json_encode($nombres_metodos);
-    $datos_js = json_encode($montos); // Montos para el gráfico de pastel
+    $datos_js = json_encode($montos); 
 }
 
 $conn->close();
@@ -180,59 +180,144 @@ $conn->close();
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Reportes de Ventas - Admin Panel</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="../assets/css/styles.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <style>
-        /* Estilos de la barra lateral (IDÉNTICOS a otros archivos) */
+        /* Paleta de colores mejorada */
+        :root {
+            --primary-color: #007bff; /* Azul vibrante */
+            --secondary-color: #6c757d;
+            --success-color: #28a745;
+            --info-color: #17a2b8;
+            --warning-color: #ffc107;
+            --danger-color: #dc3545;
+            --dark-color: #212529;
+            --light-color: #f8f9fa;
+            --card-border-radius: 12px;
+            --shadow-primary: 0 4px 12px rgba(0, 123, 255, 0.15);
+        }
+        body {
+            background: linear-gradient(135deg, #f5f7fa 0%, #e9ecef 100%);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            min-height: 100vh;
+        }
+
         .sidebar {
-            width: 250px; height: 100vh; position: fixed; background-color: #343a40; padding-top: 15px;
+            width: 250px;
+            height: 100vh;
+            position: fixed;
+            background-color: var(--dark-color);
+            padding-top: 15px;
+            box-shadow: 2px 0 10px rgba(0, 0, 0, 0.2);
         }
         .sidebar a {
-            color: #adb5bd; padding: 10px 15px; text-decoration: none; display: block;
+            color: #adb5bd;
+            padding: 12px 15px;
+            text-decoration: none;
+            display: block;
+            border-radius: 8px;
+            margin: 5px 10px;
         }
         .sidebar a:hover, .sidebar .active-link {
-            background-color: #495057; color: #fff; font-weight: bold;
+            background-color: #495057;
+            color: #fff;
+            font-weight: bold;
         }
         .main-content {
-            margin-left: 250px; padding: 20px;
+            margin-left: 250px; padding: 25px; background-color: #e9ecef;
         }
-        /* Estilos específicos del reporte */
+
+        /* --- Estilos específicos del reporte (Mejorados) --- */
+
+        /* Header de la Tarjeta */
         .card-header-blue { 
-            background-color: #0d6efd !important; 
+            background-color: var(--primary-color) !important; 
             color: white; 
-            font-weight: 600; 
-            border-bottom: 3px solid #0056b3; 
-            padding: 15px; 
+            font-weight: 700; 
+            border-top-left-radius: var(--card-border-radius);
+            border-top-right-radius: var(--card-border-radius);
+            border-bottom: none;
+            padding: 18px 20px; 
+            font-size: 1.15rem;
         }
-        .btn-toggle-dash { 
-            background-color: #f8f9fa; /* Color de fondo claro para botones */
-            color: #495057;
+        
+        /* Contenedor de Filtros */
+        .filter-form-container {
             border: 1px solid #dee2e6;
-            margin-right: 10px;
+            padding: 20px;
+            border-radius: var(--card-border-radius);
+            background-color: white; /* Fondo blanco para contraste */
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        }
+        
+        /* Botones de Toggle */
+        .btn-toggle-dash { 
+            background-color: white; 
+            color: var(--dark-color);
+            border: 1px solid #ced4da;
+            margin-right: 15px;
+            transition: all 0.3s;
+            font-weight: 500;
+            border-radius: 8px;
+            padding: 10px 20px;
+        }
+        .btn-toggle-dash:hover {
+            background-color: #e9ecef;
         }
         .btn-toggle-dash.active {
-            background-color: #17a2b8; /* Azul cyan/información */
+            background-color: var(--info-color); /* Azul cyan/información */
             color: white;
-            border-color: #17a2b8;
+            border-color: var(--info-color);
+            box-shadow: 0 4px 8px rgba(23, 162, 184, 0.3);
         }
-        .filter-form-container {
-            border: 1px solid #ccc;
-            padding: 15px;
-            border-radius: 8px;
-            background-color: #f8f9fa;
+
+        /* Tarjeta Principal */
+        .card {
+            border-radius: var(--card-border-radius);
+            border: none;
+            box-shadow: var(--shadow-primary); /* Sombra mejorada */
+            overflow: hidden; /* Asegura que el border-radius del header se vea bien */
         }
+        .card-body {
+            padding: 30px;
+        }
+        
+
+        /* Contenedores de Gráficos */
         .chart-container {
-            height: 400px; /* Altura fija para los gráficos */
+            height: 400px; 
             width: 100%;
             margin: 0 auto;
+            padding: 10px; /* Espacio alrededor del gráfico */
         }
+        
+        /* Estilos de Tablas */
+        .table-striped > tbody > tr:nth-of-type(odd) > * {
+            background-color: #f3f9ff; /* Raya azul claro */
+        }
+        .table-info, .table-warning {
+            --bs-table-bg: var(--primary-color);
+            --bs-table-color: white;
+            font-weight: 600;
+            border-bottom: 2px solid var(--primary-color);
+        }
+        .table-warning {
+            --bs-table-bg: var(--warning-color);
+            --bs-table-color: var(--dark-color);
+            border-bottom: 2px solid var(--warning-color);
+        }
+
+        /* Cards de Métricas */
         .card-facturacion {
-            border-left: 5px solid #0d6efd;
+            border-left: 5px solid var(--primary-color);
         }
         .card-transacciones {
-            border-left: 5px solid #ffc107;
+            border-left: 5px solid var(--warning-color);
+        }
+        .card-body.bg-light {
+            background-color: #fff !important; /* Fondo blanco para las métricas */
         }
     </style>
 </head>
@@ -240,23 +325,27 @@ $conn->close();
 
 <div class="d-flex">
     <div class="sidebar">
-        <h4 class="text-white text-center mb-4">ADMIN PANEL</h4>
-        <p class="text-secondary text-center">Bienvenido, <?php echo htmlspecialchars($_SESSION['usuario_data']['usuario'] ?? 'Admin'); ?></p>
-        <hr class="text-white-50">
+        <h4 class="text-white text-center mb-4 mt-2">ADMIN PANEL 📊</h4>
+        <p class="text-secondary text-center small border-bottom border-secondary pb-3 mx-3">Bienvenido, <?php echo htmlspecialchars($_SESSION['usuario_data']['usuario'] ?? 'Admin'); ?></p>
+        
         <ul class="list-unstyled components">
-            <li><a href="admin_dashboard_general.php" > ⚖ Dashboard General</a></li>
-            <li><a href="admin_dashboard.php"> 🔑 Gestión Logístico</a></li>
+            <li><a href="admin_dashboard_general.php"> ⚖ Dashboard General</a></li>
+            <li><a href="perfil_admin.php"> 🔑 Mi Perfil</a></li>
+            <hr class="text-white-50 my-2">
+            <li><a href="admin_gestionar_admin.php"> 👑 Gestión Administradores</a></li> 
+            <li><a href="admin_dashboard.php"> 💼 Gestión Logístico</a></li>
             <li><a href="admin_registrar_logistico.php">📥 Agregar Nuevo Logístico</a></li>
+            <hr class="text-white-50 my-2">
             <li><a href="admin_proveedores.php" >👨🏽‍🤝‍👨🏻 Proveedores</a></li>
-            <li><a href="admin_reporte_ventas.php" class="active-link">📊 Reportes de Ventas</a></li>
-            <li class="mt-5"><a href="../public/logout.php" class="btn btn-danger btn-sm w-100"><i class="fas fa-sign-out-alt me-2"></i> Cerrar Sesión</a></li>
+            <li><a href="admin_reporte_ventas.php" class="active-link">📈 Reportes de Ventas</a></li>
+            <li class="mt-5"><a href="../public/logout.php" class="btn btn-danger btn-sm w-75 mx-auto d-block"><i class="fas fa-sign-out-alt me-2"></i> Cerrar Sesión</a></li>
         </ul>
     </div>
     
     <div class="main-content flex-grow-1">
-        <h2 class="mb-4"><i class="fas fa-chart-line me-2"></i> Reportes y Dashboards de Ventas</h2>
+        <h2 class="mb-4 text-dark"><i class="fas fa-chart-line me-2 text-primary"></i> **Reportes y Dashboards de Ventas**</h2>
         
-        <div class="mb-4 d-flex">
+        <div class="mb-4 d-flex justify-content-start">
             <a href="?dash=productos" class="btn btn-toggle-dash <?php echo ($dashboard_activo === 'productos') ? 'active' : ''; ?>">
                 <i class="fas fa-box-open me-2"></i> Productos Más Vendidos
             </a>
@@ -268,60 +357,64 @@ $conn->close();
             </a>
         </div>
 
-        <div class="card shadow mb-4">
+        <div class="card shadow-sm mb-5">
             <div class="card-header card-header-blue">
-                <i class="fas fa-filter me-2"></i> Filtros Personalizados (Rango de Fechas: **<?php echo $fecha_inicio . ' al ' . $fecha_fin; ?>**)
+                <i class="fas fa-filter me-2"></i> Filtros Personalizados (Rango de Fechas: <?php echo $fecha_inicio . ' al ' . $fecha_fin; ?>)
             </div>
-            <div class="card-body filter-form-container">
-                <form action="admin_reporte_ventas.php" method="POST" class="row align-items-end">
+            <div class="card-body bg-white">
+                <form action="admin_reporte_ventas.php" method="POST" class="row align-items-end g-3">
                     <input type="hidden" name="dashboard_activo" value="<?php echo htmlspecialchars($dashboard_activo); ?>">
-                    <div class="col-md-4 mb-3">
-                        <label for="fecha_inicio" class="form-label">Fecha de Inicio</label>
+                    <div class="col-md-4">
+                        <label for="fecha_inicio" class="form-label fw-bold">Fecha de Inicio</label>
                         <input type="date" class="form-control" id="fecha_inicio" name="fecha_inicio" value="<?php echo htmlspecialchars($fecha_inicio); ?>" required>
                     </div>
-                    <div class="col-md-4 mb-3">
-                        <label for="fecha_fin" class="form-label">Fecha de Fin</label>
+                    <div class="col-md-4">
+                        <label for="fecha_fin" class="form-label fw-bold">Fecha de Fin</label>
                         <input type="date" class="form-control" id="fecha_fin" name="fecha_fin" value="<?php echo htmlspecialchars($fecha_fin); ?>" required>
                     </div>
-                    <div class="col-md-4 mb-3 d-grid">
-                        <button type="submit" class="btn btn-primary"><i class="fas fa-search me-2"></i> Aplicar Filtros</button>
+                    <div class="col-md-4 d-grid">
+                        <button type="submit" class="btn btn-primary btn-lg"><i class="fas fa-search me-2"></i> Aplicar Filtros</button>
                     </div>
                 </form>
             </div>
         </div>
-
+        
         <?php if ($dashboard_activo === 'productos'): ?>
             <div class="card shadow mb-4">
                 <div class="card-header card-header-blue">
-                    <i class="fas fa-cubes me-2"></i> Top 10 Productos Más Vendidos (Cantidad y Contribución)
+                    <i class="fas fa-cubes me-2"></i> Top 10 Productos Más Vendidos (**Cantidad y Facturación**)
                 </div>
                 <div class="card-body">
                     <?php if (!empty($datos_dashboard)): ?>
-                        <div class="row">
+                        <div class="row g-4">
                             <div class="col-md-7">
-                                <h5>Ventas por Cantidad (Gráfico de Barras)</h5>
-                                <div class="chart-container">
-                                    <canvas id="chartCantidad"></canvas>
+                                <div class="p-3 border rounded h-100 bg-light">
+                                    <h5 class="fw-bold text-dark border-bottom pb-2">Ventas por Cantidad (Gráfico de Barras)</h5>
+                                    <div class="chart-container">
+                                        <canvas id="chartCantidad"></canvas>
+                                    </div>
                                 </div>
                             </div>
                             <div class="col-md-5">
-                                <h5>Ventas por Facturación (Gráfico de Pastel)</h5>
-                                <div class="chart-container" style="height: 350px;">
-                                    <canvas id="chartFacturacion"></canvas>
+                                <div class="p-3 border rounded h-100 bg-light">
+                                    <h5 class="fw-bold text-dark border-bottom pb-2">Ventas por Facturación (Gráfico de Pastel)</h5>
+                                    <div class="chart-container" style="height: 350px;">
+                                        <canvas id="chartFacturacion"></canvas>
+                                    </div>
                                 </div>
                             </div>
                         </div>
 
-                        <h5 class="mt-4">Detalle del Top 10 (Tabla)</h5>
+                        <h5 class="mt-5 mb-3 fw-bold text-dark"><i class="fas fa-table me-2"></i> Detalle del Top 10 (Tabla)</h5>
                         <div class="table-responsive">
-                            <table class="table table-striped table-bordered table-sm">
-                                <thead class="table-info">
+                            <table class="table table-hover table-bordered table-sm">
+                                <thead class="table-primary">
                                     <tr>
                                         <th>#</th>
                                         <th>Producto</th>
-                                        <th>Cantidad Vendida</th>
-                                        <th>Facturación Total</th>
-                                        <th>% Contribución</th>
+                                        <th class="text-center">Cantidad Vendida</th>
+                                        <th class="text-end">Facturación Total</th>
+                                        <th class="text-end">% Contribución</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -334,17 +427,17 @@ $conn->close();
                                     <tr>
                                         <td><?php echo $i++; ?></td>
                                         <td><?php echo htmlspecialchars($item['nombre_producto']); ?></td>
-                                        <td class="text-center fw-bold"><?php echo htmlspecialchars($item['total_cantidad']); ?> Unidades</td>
-                                        <td class="text-end">S/ <?php echo number_format($item['total_facturado'], 2); ?></td>
-                                        <td class="text-end fw-bold text-success"><?php echo number_format($contribucion, 2); ?>%</td>
+                                        <td class="text-center fw-bold text-info"><?php echo htmlspecialchars($item['total_cantidad']); ?> Unidades</td>
+                                        <td class="text-end fw-bold text-success">S/ <?php echo number_format($item['total_facturado'], 2); ?></td>
+                                        <td class="text-end fw-bold text-primary"><?php echo number_format($contribucion, 2); ?>%</td>
                                     </tr>
                                     <?php endforeach; ?>
                                 </tbody>
                             </table>
                         </div>
                     <?php else: ?>
-                        <div class="alert alert-warning text-center">
-                            No se encontraron ventas (pedidos **pagados**) para el rango de fechas seleccionado.
+                        <div class="alert alert-warning text-center border-0" role="alert">
+                            <i class="fas fa-exclamation-triangle me-2"></i> No se encontraron ventas (pedidos **pagados**) para el rango de fechas seleccionado.
                         </div>
                     <?php endif; ?>
                 </div>
@@ -364,35 +457,42 @@ $conn->close();
                     <i class="fas fa-chart-area me-2"></i> Evolución de Ventas por Día
                 </div>
                 <div class="card-body">
-                    <div class="row">
+                    <div class="row g-4">
                         <div class="col-md-8">
-                            <h5>Gráfico de Líneas - Ventas Diarias (S/.)</h5>
-                            <div class="chart-container">
-                                <?php if ($hay_ventas): ?>
-                                    <canvas id="chartVentasLinea"></canvas>
-                                <?php else: ?>
-                                    <div class="alert alert-warning text-center p-5">No hay datos de ventas para mostrar en este período.</div>
-                                <?php endif; ?>
+                            <div class="p-3 border rounded h-100 bg-light">
+                                <h5 class="fw-bold text-dark border-bottom pb-2">Gráfico de Líneas - Ventas Diarias (S/.)</h5>
+                                <div class="chart-container">
+                                    <?php if ($hay_ventas): ?>
+                                        <canvas id="chartVentasLinea"></canvas>
+                                    <?php else: ?>
+                                        <div class="alert alert-warning text-center p-5 border-0">
+                                            <i class="fas fa-exclamation-circle me-2"></i> No hay datos de ventas para mostrar en este período.
+                                        </div>
+                                    <?php endif; ?>
+                                </div>
                             </div>
                         </div>
                         <div class="col-md-4">
-                            <h5 class="text-center">Métricas Clave del Período</h5>
-                            <div class="card shadow mb-3 card-facturacion">
+                            <h5 class="text-center fw-bold text-dark border-bottom pb-2">Métricas Clave del Período</h5>
+                            
+                            <div class="card shadow-sm mb-3 card-facturacion">
                                 <div class="card-body bg-light">
-                                    <p class="mb-0 text-muted small">Total Facturado Bruto:</p>
-                                    <h3 class="mb-0 text-primary">S/ <?php echo number_format($total_facturado, 2); ?></h3>
+                                    <p class="mb-0 text-muted small"><i class="fas fa-calculator me-2"></i> Total Facturado Bruto:</p>
+                                    <h3 class="mb-0 text-primary fw-bold">S/ <?php echo number_format($total_facturado, 2); ?></h3>
                                 </div>
                             </div>
-                            <div class="card shadow mb-3 card-facturacion">
+                            
+                            <div class="card shadow-sm mb-3 card-facturacion">
                                 <div class="card-body bg-light">
-                                    <p class="mb-0 text-muted small">Días Analizados:</p>
-                                    <h4 class="mb-0 text-dark"><?php echo $dias_analizados; ?></h4>
+                                    <p class="mb-0 text-muted small"><i class="fas fa-calendar-alt me-2"></i> Días Analizados:</p>
+                                    <h4 class="mb-0 text-dark fw-bold"><?php echo $dias_analizados; ?></h4>
                                 </div>
                             </div>
-                            <div class="card shadow mb-3 card-facturacion">
+                            
+                            <div class="card shadow-sm mb-3 card-facturacion">
                                 <div class="card-body bg-light">
-                                    <p class="mb-0 text-muted small">Venta Promedio (Días con Venta):</p>
-                                    <h4 class="mb-0 text-success">S/ <?php echo number_format($promedio, 2); ?></h4>
+                                    <p class="mb-0 text-muted small"><i class="fas fa-money-bill-wave me-2"></i> Venta Promedio (Días con Venta):</p>
+                                    <h4 class="mb-0 text-success fw-bold">S/ <?php echo number_format($promedio, 2); ?></h4>
                                 </div>
                             </div>
                         </div>
@@ -408,17 +508,19 @@ $conn->close();
                 </div>
                 <div class="card-body">
                     <?php if (!empty($datos_dashboard)): ?>
-                        <div class="row">
+                        <div class="row g-4">
                             <div class="col-md-5">
-                                <h5>Distribución por Monto (Gráfico de Pastel)</h5>
-                                <div class="chart-container" style="height: 350px;">
-                                    <canvas id="chartMetodosPago"></canvas>
+                                <div class="p-3 border rounded h-100 bg-light">
+                                    <h5 class="fw-bold text-dark border-bottom pb-2">Distribución por Monto (Gráfico de Rosca)</h5>
+                                    <div class="chart-container" style="height: 350px;">
+                                        <canvas id="chartMetodosPago"></canvas>
+                                    </div>
                                 </div>
                             </div>
                             <div class="col-md-7">
-                                <h5 class="mb-3">Detalle de Métodos de Pago (Tabla)</h5>
-                                <div class="table-responsive">
-                                    <table class="table table-striped table-bordered">
+                                <h5 class="fw-bold text-dark border-bottom pb-2"><i class="fas fa-list me-2"></i> Detalle de Métodos de Pago</h5>
+                                <div class="table-responsive mt-3">
+                                    <table class="table table-hover table-bordered">
                                         <thead class="table-warning">
                                             <tr>
                                                 <th>Método de Pago</th>
@@ -434,14 +536,14 @@ $conn->close();
                                                     $porcentaje = ($total_general > 0) ? ($item['total_monto'] / $total_general) * 100 : 0;
                                             ?>
                                                 <tr>
-                                                    <td><span class="badge bg-secondary"><?php echo strtoupper(htmlspecialchars($item['metodo_pago'])); ?></span></td>
-                                                    <td class="text-center"><?php echo htmlspecialchars($item['total_transacciones']); ?></td>
+                                                    <td><span class="badge bg-secondary p-2"><?php echo strtoupper(htmlspecialchars($item['metodo_pago'])); ?></span></td>
+                                                    <td class="text-center fw-bold"><?php echo htmlspecialchars($item['total_transacciones']); ?></td>
                                                     <td class="text-end fw-bold text-success">S/ <?php echo number_format($item['total_monto'], 2); ?></td>
-                                                    <td class="text-end"><?php echo number_format($porcentaje, 2); ?>%</td>
+                                                    <td class="text-end fw-bold text-info"><?php echo number_format($porcentaje, 2); ?>%</td>
                                                 </tr>
                                             <?php endforeach; ?>
                                             <tr class="table-dark">
-                                                <td class="fw-bold">TOTAL</td>
+                                                <td class="fw-bold">TOTAL GENERAL</td>
                                                 <td class="text-center fw-bold"><?php echo array_sum(array_column($datos_dashboard, 'total_transacciones')); ?></td>
                                                 <td class="text-end fw-bold">S/ <?php echo number_format($total_general, 2); ?></td>
                                                 <td class="text-end fw-bold">100.00%</td>
@@ -452,8 +554,8 @@ $conn->close();
                             </div>
                         </div>
                     <?php else: ?>
-                        <div class="alert alert-warning text-center">
-                            No se encontraron transacciones registradas para pedidos con estado **'pagado'** en el rango de fechas seleccionado.
+                        <div class="alert alert-warning text-center border-0" role="alert">
+                            <i class="fas fa-exclamation-triangle me-2"></i> No se encontraron transacciones registradas para pedidos con estado **'pagado'** en el rango de fechas seleccionado.
                         </div>
                     <?php endif; ?>
                 </div>
@@ -463,23 +565,21 @@ $conn->close();
     </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         const dashboardActivo = '<?php echo $dashboard_activo; ?>';
         
-        // Función para generar colores aleatorios para gráficos de pastel
+        // Paleta de colores más moderna
         function generateColors(count) {
-            const baseColors = [
-                '#0d6efd', '#dc3545', '#ffc107', '#20c997', '#6f42c1', 
-                '#fd7e14', '#17a2b8', '#e83e8c', '#6c757d', '#adb5bd'
+            const vibrantColors = [
+                '#007bff', '#dc3545', '#ffc107', '#28a745', '#6f42c1', 
+                '#17a2b8', '#e83e8c', '#fd7e14', '#20c997', '#6c757d'
             ];
             const colors = [];
             for (let i = 0; i < count; i++) {
-                // Usar un color base y generar un tono aleatorio si se agotan
-                const base = baseColors[i % baseColors.length];
-                colors.push(base);
+                colors.push(vibrantColors[i % vibrantColors.length]);
             }
             return colors;
         }
@@ -490,7 +590,7 @@ $conn->close();
         if (dashboardActivo === 'productos') {
             const etiquetasProductos = <?php echo $etiquetas_js; ?>;
             const datosCantidades = <?php echo $datos_js; ?>;
-            const datosFacturacion = <?php echo $datos_extra_js; ?>; // Facturación
+            const datosFacturacion = <?php echo $datos_extra_js; ?>; 
 
             if (etiquetasProductos.length > 0) {
                 const colores = generateColors(etiquetasProductos.length);
@@ -504,8 +604,10 @@ $conn->close();
                             datasets: [{
                                 label: 'Cantidad Vendida (Unidades)',
                                 data: datosCantidades,
-                                backgroundColor: '#0d6efd', 
-                                borderWidth: 1
+                                backgroundColor: '#007bff', // Usar color primario
+                                borderColor: '#0056b3',
+                                borderWidth: 1,
+                                borderRadius: 5,
                             }]
                         },
                         options: {
@@ -514,9 +616,19 @@ $conn->close();
                             indexAxis: 'y', // Barras horizontales
                             plugins: {
                                 legend: { display: false },
+                                tooltip: {
+                                    callbacks: {
+                                        label: function(context) {
+                                            return context.dataset.label + ': ' + context.parsed.x + ' Unidades';
+                                        }
+                                    }
+                                }
                             },
                             scales: {
-                                x: { beginAtZero: true },
+                                x: { 
+                                    beginAtZero: true, 
+                                    grid: { display: true, color: 'rgba(0, 0, 0, 0.05)' }
+                                },
                                 y: { grid: { display: false } }
                             }
                         }
@@ -533,20 +645,32 @@ $conn->close();
                                 label: 'Facturación (S/)',
                                 data: datosFacturacion,
                                 backgroundColor: colores,
-                                hoverOffset: 4
+                                hoverOffset: 10 // Aumento del hover
                             }]
                         },
                         options: {
                             responsive: true,
                             maintainAspectRatio: false,
                             plugins: {
-                                legend: { position: 'bottom' },
+                                legend: { 
+                                    position: 'bottom',
+                                    labels: {
+                                        usePointStyle: true,
+                                        padding: 20
+                                    }
+                                },
                                 tooltip: { 
                                     callbacks: {
                                         label: function(context) {
                                             let label = context.label || '';
                                             if (label) { label += ': '; }
-                                            if (context.parsed !== null) { label += 'S/ ' + context.parsed.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ","); }
+                                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                            const currentValue = context.parsed;
+                                            const percentage = ((currentValue / total) * 100).toFixed(2);
+                                            
+                                            if (context.parsed !== null) { 
+                                                label += 'S/ ' + currentValue.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",") + ` (${percentage}%)`; 
+                                            }
                                             return label;
                                         }
                                     }
@@ -574,34 +698,45 @@ $conn->close();
                             datasets: [{
                                 label: 'Ventas Diarias (S/.)',
                                 data: datosVentas,
-                                borderColor: '#20c997', 
-                                backgroundColor: 'rgba(32, 201, 151, 0.2)',
+                                borderColor: '#28a745', // Color verde para ventas
+                                backgroundColor: 'rgba(40, 167, 69, 0.1)',
                                 fill: true,
-                                tension: 0.3,
-                                pointRadius: 3,
-                                pointHoverRadius: 5
+                                tension: 0.4, // Curva más suave
+                                pointRadius: 4,
+                                pointBackgroundColor: '#28a745',
+                                pointBorderColor: '#fff',
+                                pointHoverRadius: 6
                             }]
                         },
                         options: {
                             responsive: true,
                             maintainAspectRatio: false,
                             plugins: {
-                                legend: { display: false },
+                                legend: { display: true, position: 'top' },
+                                tooltip: {
+                                    callbacks: {
+                                        label: function(context) {
+                                            return context.dataset.label + ': S/ ' + context.parsed.y.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+                                        }
+                                    }
+                                }
                             },
                             scales: {
                                 y: {
                                     beginAtZero: true,
-                                    title: { display: true, text: 'Monto (S/.)' }
+                                    title: { display: true, text: 'Monto (S/.)', font: { weight: 'bold' } },
+                                    grid: { color: 'rgba(0, 0, 0, 0.05)' }
                                 },
                                 x: {
-                                    title: { display: true, text: 'Fecha' },
-                                    // Mejorar la visualización de etiquetas si hay muchos días
+                                    title: { display: true, text: 'Fecha', font: { weight: 'bold' } },
                                     ticks: {
                                         maxRotation: 45,
                                         minRotation: 45,
                                         autoSkip: true,
-                                        maxTicksLimit: 15 
-                                    }
+                                        maxTicksLimit: 15,
+                                        color: '#6c757d'
+                                    },
+                                    grid: { display: false }
                                 }
                             }
                         }
@@ -628,20 +763,33 @@ $conn->close();
                             label: 'Monto Facturado por Método (S/)',
                             data: datosMontos,
                             backgroundColor: colores,
-                            hoverOffset: 4
+                            hoverOffset: 10
                         }]
                     },
                     options: {
                         responsive: true,
                         maintainAspectRatio: false,
+                        cutout: '70%', // Grosor del anillo
                         plugins: {
-                            legend: { position: 'bottom' },
+                            legend: { 
+                                position: 'bottom',
+                                labels: {
+                                    usePointStyle: true,
+                                    padding: 20
+                                }
+                            },
                             tooltip: { 
                                 callbacks: {
                                     label: function(context) {
                                         let label = context.label || '';
                                         if (label) { label += ': '; }
-                                        if (context.parsed !== null) { label += 'S/ ' + context.parsed.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ","); }
+                                        const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                        const currentValue = context.parsed;
+                                        const percentage = ((currentValue / total) * 100).toFixed(2);
+                                        
+                                        if (context.parsed !== null) { 
+                                            label += 'S/ ' + currentValue.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",") + ` (${percentage}%)`; 
+                                        }
                                         return label;
                                     }
                                 }

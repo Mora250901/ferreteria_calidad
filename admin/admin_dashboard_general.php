@@ -137,237 +137,309 @@ if (!$filtro_activo) {
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="../assets/css/styles.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    
     <style>
-        /* Estilos básicos para la estructura del Dashboard */
+        :root {
+            --primary-color: #dc3545; /* Rojo/Danger */
+            --success-color: #198754; /* Verde/Success */
+            --warning-color: #ffc107; /* Amarillo/Warning */
+            --info-color: #0dcaf0; /* Azul claro/Info */
+            --secondary-color: #6c757d; /* Gris/Secondary */
+            --dark-color: #212529; /* Negro/Dark */
+            --bg-light: #f8f9fa;
+        }
+
+        body {
+            /* Fondo limpio y moderno */
+            background: linear-gradient(135deg, #f5f7fa 0%, #e9ecef 100%);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            min-height: 100vh;
+        }
+
+        /* Estilos del Sidebar (adaptados) */
         .sidebar {
             width: 250px;
             height: 100vh;
             position: fixed;
-            background-color: #343a40; 
+            background-color: var(--dark-color); /* Fondo oscuro para contraste */
             padding-top: 15px;
+            box-shadow: 2px 0 10px rgba(0, 0, 0, 0.2);
         }
         .sidebar a {
             color: #adb5bd;
-            padding: 10px 15px;
+            padding: 12px 15px;
             text-decoration: none;
             display: block;
+            border-radius: 8px;
+            margin: 5px 10px;
         }
-        .sidebar a:hover {
-            background-color: #495057;
-            color: #fff;
-        }
-        /* Estilo para el enlace activo (Dashboard General) */
-        .sidebar .active-link {
+        .sidebar a:hover, .sidebar .active-link {
             background-color: #495057;
             color: #fff;
             font-weight: bold;
         }
         .main-content {
             margin-left: 250px; 
+            padding: 30px; /* Mayor padding para un look más espacioso */
+        }
+        .page-header {
+             /* Se reemplaza por la bienvenida en el main-content para una mejor integración */
+        }
+
+        /* FILTROS (Basado en la referencia) */
+        .filters-section {
+            background: white;
+            border-radius: 16px;
             padding: 20px;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 15px rgba(0,0,0,.08); /* Sombra más definida */
+        }
+
+        /* TARJETAS KPI (Adaptadas para el estilo moderno) */
+        .stat-card {
+            background: white;
+            border-radius: 16px;
+            padding: 25px;
+            box-shadow: 0 2px 10px rgba(0,0,0,.05);
+            transition: all .3s;
+            border: 2px solid transparent;
+            height: 100%; /* Asegura que todas tengan la misma altura */
+        }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 6px 20px rgba(0,0,0,.1);
+            border-color: var(--primary-color);
         }
         
-        /* Estilos para las tarjetas KPI */
-        .kpi-card {
-            border: none;
-            border-radius: 10px;
-            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
-            transition: transform 0.3s;
+        .stat-icon-wrapper {
+            width: 60px;
+            height: 60px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+            margin-bottom: 15px;
         }
-        .kpi-card:hover {
+
+        /* Colores de íconos para cada KPI */
+        .icon-primary { background: #ffebeb; color: var(--primary-color); }
+        .icon-success { background: #f0fdf4; color: var(--success-color); }
+        .icon-info { background: #e0f7fa; color: var(--info-color); }
+        .icon-secondary { background: #e9e9eb; color: var(--secondary-color); }
+        .icon-warning { background: #fff8e1; color: var(--warning-color); }
+        .icon-dark { background: #e5e7eb; color: var(--dark-color); }
+        .icon-danger { background: #fde7e7; color: var(--primary-color); }
+
+        .stat-value {
+            font-size: 32px;
+            font-weight: 700;
+            color: var(--dark-color);
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            color: var(--secondary-color);
+            font-size: 14px;
+            text-transform: uppercase;
+        }
+        
+        /* ACCESO RÁPIDO (Se adapta el estilo .stat-card) */
+        .quick-access-card a {
+            text-decoration: none;
+            display: block;
+            height: 100%;
+        }
+        .quick-access-card .card {
+            background: white;
+            border-radius: 16px;
+            padding: 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,.05);
+            transition: all .3s;
+            border: 1px solid #f0f0f0;
+        }
+        .quick-access-card .card:hover {
             transform: translateY(-5px);
+            box-shadow: 0 8px 25px rgba(0,0,0,.15);
+            border-color: var(--primary-color);
         }
-        .kpi-icon {
-            font-size: 3rem;
-            opacity: 0.5;
+        .quick-access-card .card-title {
+            font-weight: 700;
+            color: var(--dark-color);
         }
-        .kpi-value {
-            font-size: 2.5rem;
-            font-weight: bold;
+        .quick-access-card .card-text {
+            color: var(--secondary-color);
         }
-        /* Estilo del card-header personalizado */
-        .card-header-blue {
-            background-color: #0d6efd; /* Azul de Bootstrap Primary */
-            color: white;
-            font-weight: bold;
-        }
+
     </style>
-</head>
+    </head>
 <body>
 
 <div class="d-flex">
     <div class="sidebar">
-        <h4 class="text-white text-center mb-4">ADMIN PANEL</h4>
-        <p class="text-secondary text-center">Bienvenido, <?php echo htmlspecialchars($_SESSION['usuario_data']['usuario'] ?? 'Admin'); ?></p>
-        <hr class="text-white-50">
+        <h4 class="text-white text-center mb-4 mt-2">ADMIN PANEL 📊</h4>
+        <p class="text-secondary text-center small border-bottom border-secondary pb-3 mx-3">Bienvenido, <?php echo htmlspecialchars($_SESSION['usuario_data']['usuario'] ?? 'Admin'); ?></p>
+        
         <ul class="list-unstyled components">
-            <li>
-                <a href="admin_dashboard_general.php" class="active-link"> ⚖ Dashboard General
-                </a>
-            </li>
-            
-            <li><a href="admin_dashboard.php">  🔑 Gestión Logístico</a></li>
+            <li><a href="admin_dashboard_general.php" class="active-link"> ⚖ Dashboard General</a></li>
+            <li><a href="perfil_admin.php"> 🔑 Mi Perfil</a></li>
+            <hr class="text-white-50 my-2">
+            <li><a href="admin_gestionar_admin.php"> 👑 Gestión Administradores</a></li> 
+            <li><a href="admin_dashboard.php"> 💼 Gestión Logístico</a></li>
             <li><a href="admin_registrar_logistico.php">📥 Agregar Nuevo Logístico</a></li>
-            <li><a href="admin_proveedores.php">👨🏽‍🤝‍👨🏻 Proveedores</a></li>          
-
-            <li><a href="admin_reporte_ventas.php">📊 Reportes de Ventas</a></li>
-            
-            <li class="mt-5"><a href="../public/logout.php" class="btn btn-danger btn-sm w-100"><i class="fas fa-sign-out-alt me-2"></i> Cerrar Sesión</a></li>
+            <hr class="text-white-50 my-2">
+            <li><a href="admin_proveedores.php">👨🏽‍🤝‍👨🏻 Proveedores</a></li>
+            <li><a href="admin_reporte_ventas.php">📈 Reportes de Ventas</a></li>
+            <li class="mt-5"><a href="../public/logout.php" class="btn btn-danger btn-sm w-75 mx-auto d-block"><i class="fas fa-sign-out-alt me-2"></i> Cerrar Sesión</a></li>
         </ul>
     </div>
 
     <div class="main-content flex-grow-1">
-        <h2 class="mb-4">Resumen General del Sistema</h2>
         
-        <div class="card shadow mb-4">
-            <div class="card-header card-header-blue d-flex justify-content-between align-items-center">
-                <h5 class="mb-0"><i class="fas fa-filter me-2"></i> Filtros Personalizados (Rango de Fechas)</h5>
-                <a class="btn btn-sm btn-outline-light" href="admin_dashboard_general.php"><i class="fas fa-sync-alt me-1"></i> Limpiar Filtros</a>
-            </div>
-            <div class="card-body filter-form-container">
-                <form action="admin_dashboard_general.php" method="GET" class="row align-items-end">
-                    <div class="col-md-4 mb-3">
-                        <label for="fecha_inicio" class="form-label">Fecha de Inicio</label>
-                        <input type="date" class="form-control" id="fecha_inicio" name="fecha_inicio" value="<?php echo htmlspecialchars($fecha_inicio); ?>" required>
-                    </div>
-                    <div class="col-md-4 mb-3">
-                        <label for="fecha_fin" class="form-label">Fecha de Fin</label>
-                        <input type="date" class="form-control" id="fecha_fin" name="fecha_fin" value="<?php echo htmlspecialchars($fecha_fin); ?>" required>
-                    </div>
-                    <div class="col-md-4 mb-3 d-grid">
-                        <button type="submit" class="btn btn-primary"><i class="fas fa-search me-2"></i> Aplicar Filtros</button>
-                    </div>
-                </form>
-            </div>
+        <div class="mb-5">
+             <h1 class="display-6 fw-bold text-dark">👋 Panel de Control Principal</h1>
+             <p class="text-secondary fs-5">Vista rápida y analítica del rendimiento general del sistema.</p>
         </div>
-        <div class="row g-4">
+
+        <div class="filters-section">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="mb-0 text-primary"><i class="fas fa-calendar-alt me-2"></i> Filtros de Rango de Fechas</h5>
+                <a class="btn btn-sm btn-outline-secondary" href="admin_dashboard_general.php"><i class="fas fa-sync-alt me-1"></i> Limpiar Filtros</a>
+            </div>
+            <form action="admin_dashboard_general.php" method="GET" class="row align-items-end g-3">
+                <div class="col-md-5">
+                    <label for="fecha_inicio" class="form-label small text-muted">Desde</label>
+                    <input type="date" class="form-control" id="fecha_inicio" name="fecha_inicio" value="<?php echo htmlspecialchars($fecha_inicio); ?>" required>
+                </div>
+                <div class="col-md-5">
+                    <label for="fecha_fin" class="form-label small text-muted">Hasta</label>
+                    <input type="date" class="form-control" id="fecha_fin" name="fecha_fin" value="<?php echo htmlspecialchars($fecha_fin); ?>" required>
+                </div>
+                <div class="col-md-2 d-grid">
+                    <button type="submit" class="btn btn-primary"><i class="fas fa-search me-2"></i> Aplicar</button>
+                </div>
+            </form>
+        </div>
+        <h3 class="mb-4">Indicadores Clave de Rendimiento (KPIs)</h3>
+        
+        <div class="row g-4 stats-container">
             
             <div class="col-md-6 col-lg-3">
-                <div class="card bg-primary text-white kpi-card">
-                    <div class="card-body d-flex justify-content-between align-items-center">
-                        <div>
-                            <div class="text-uppercase small"><?php echo htmlspecialchars($filtro_aplicado_texto); ?></div>
-                            <div class="kpi-value">S/ <?php echo number_format($ventas_filtradas, 2); ?></div>
-                        </div>
-                        <i class="fas fa-filter kpi-icon"></i>
+                <div class="stat-card">
+                    <div class="stat-icon-wrapper icon-primary">
+                        <i class="fas fa-filter"></i>
                     </div>
+                    <div class="stat-value">S/ <?php echo number_format($ventas_filtradas, 2); ?></div>
+                    <div class="stat-label">Ventas Filtradas</div>
+                    <p class="small text-muted mt-1 mb-0"><?php echo htmlspecialchars($filtro_aplicado_texto); ?></p>
                 </div>
             </div>
 
             <div class="col-md-6 col-lg-3">
-                <div class="card bg-success text-white kpi-card">
-                    <div class="card-body d-flex justify-content-between align-items-center">
-                        <div>
-                            <div class="text-uppercase small">Ventas Totales (HISTÓRICO)</div>
-                            <div class="kpi-value">S/ <?php echo number_format($ventas_totales_historicas, 2); ?></div>
-                        </div>
-                        <i class="fas fa-dollar-sign kpi-icon"></i>
+                <div class="stat-card">
+                    <div class="stat-icon-wrapper icon-success">
+                        <i class="fas fa-dollar-sign"></i>
                     </div>
+                    <div class="stat-value">S/ <?php echo number_format($ventas_totales_historicas, 2); ?></div>
+                    <div class="stat-label">Ventas Totales</div>
+                    <p class="small text-muted mt-1 mb-0">Total acumulado histórico.</p>
                 </div>
             </div>
 
             <div class="col-md-6 col-lg-3">
-                <div class="card bg-info text-white kpi-card">
-                    <div class="card-body d-flex justify-content-between align-items-center">
-                        <div>
-                            <div class="text-uppercase small">Órdenes Realizadas</div>
-                            <div class="kpi-value"><?php echo number_format($ordenes_totales); ?></div>
-                        </div>
-                        <i class="fas fa-clipboard-list kpi-icon"></i>
+                <div class="stat-card">
+                    <div class="stat-icon-wrapper icon-info">
+                        <i class="fas fa-clipboard-list"></i>
                     </div>
+                    <div class="stat-value"><?php echo number_format($ordenes_totales); ?></div>
+                    <div class="stat-label">Órdenes Realizadas</div>
+                    <p class="small text-muted mt-1 mb-0">Pedidos generados en el sistema.</p>
                 </div>
             </div>
             
             <div class="col-md-6 col-lg-3">
-                <div class="card bg-secondary text-white kpi-card">
-                    <div class="card-body d-flex justify-content-between align-items-center">
-                        <div>
-                            <div class="text-uppercase small">Clientes Registrados</div>
-                            <div class="kpi-value"><?php echo number_format($clientes_registrados); ?></div>
-                        </div>
-                        <i class="fas fa-users kpi-icon"></i>
+                <div class="stat-card">
+                    <div class="stat-icon-wrapper icon-secondary">
+                        <i class="fas fa-users"></i>
                     </div>
+                    <div class="stat-value"><?php echo number_format($clientes_registrados); ?></div>
+                    <div class="stat-label">Clientes Registrados</div>
+                    <p class="small text-muted mt-1 mb-0">Cuentas de clientes activas.</p>
                 </div>
             </div>
             
             <div class="col-md-6 col-lg-3">
-                <div class="card bg-warning text-dark kpi-card">
-                    <div class="card-body d-flex justify-content-between align-items-center">
-                        <div>
-                            <div class="text-uppercase small">Proveedores Registrados</div>
-                            <div class="kpi-value"><?php echo number_format($proveedores_registrados); ?></div>
-                        </div>
-                        <i class="fas fa-truck-loading kpi-icon"></i>
+                <div class="stat-card">
+                    <div class="stat-icon-wrapper icon-warning">
+                        <i class="fas fa-truck-loading"></i>
                     </div>
+                    <div class="stat-value"><?php echo number_format($proveedores_registrados); ?></div>
+                    <div class="stat-label">Proveedores Activos</div>
+                    <p class="small text-muted mt-1 mb-0">Cantidad de socios comerciales.</p>
                 </div>
             </div>
 
             <div class="col-md-6 col-lg-3">
-                <div class="card bg-dark text-white kpi-card">
-                    <div class="card-body d-flex justify-content-between align-items-center">
-                        <div>
-                            <div class="text-uppercase small">Productos en Stock</div>
-                            <div class="kpi-value"><?php echo number_format($productos_en_stock); ?></div>
-                        </div>
-                        <i class="fas fa-cubes kpi-icon"></i>
+                <div class="stat-card">
+                    <div class="stat-icon-wrapper icon-dark">
+                        <i class="fas fa-cubes"></i>
                     </div>
+                    <div class="stat-value"><?php echo number_format($productos_en_stock); ?></div>
+                    <div class="stat-label">Productos en Stock</div>
+                    <p class="small text-muted mt-1 mb-0">Items con stock positivo.</p>
                 </div>
             </div>
             
             <?php if ($alertas_stock > 0): ?>
             <div class="col-md-6 col-lg-3">
-                <div class="card bg-danger text-white kpi-card"> 
-                    <div class="card-body d-flex justify-content-between align-items-center">
-                        <div>
-                            <div class="text-uppercase small">🚨 Productos Bajo Stock</div>
-                            <div class="kpi-value"><?php echo number_format($alertas_stock); ?></div>
-                        </div>
-                        <i class="fas fa-exclamation-triangle kpi-icon"></i>
+                <div class="stat-card" style="border-color: var(--primary-color);"> 
+                    <div class="stat-icon-wrapper icon-danger">
+                        <i class="fas fa-exclamation-triangle"></i>
                     </div>
+                    <div class="stat-value text-danger"><?php echo number_format($alertas_stock); ?></div>
+                    <div class="stat-label">🚨 ALERTA: Bajo Stock</div>
+                    <p class="small text-muted mt-1 mb-0">Productos críticos, ¡requieren atención!</p>
                 </div>
             </div>
             <?php endif; ?>
-
         </div>
-        
         <hr class="my-5">
         
-        <h3 class="mb-4">Secciones de Acceso Rápido</h3>
+        <h3 class="mb-4">🚀 Acciones y Secciones Rápidas</h3>
         
-        <div class="row g-4">
+        <div class="row g-4 quick-access-card">
             <div class="col-md-4">
-                <a href="admin_dashboard.php" class="text-decoration-none">
-                    <div class="card text-center p-4 h-100 shadow-sm bg-light">
-                        <i class="fas fa-truck fa-3x text-primary mb-3"></i>
-                        <h5 class="card-title">Gestión de Logísticos</h5>
-                        <p class="card-text text-muted">Suspender, activar o registrar nuevo personal.</p>
+                <a href="admin_dashboard.php">
+                    <div class="card text-center h-100 shadow-sm">
+                        <i class="fas fa-user-shield fa-3x text-primary mb-3"></i>
+                        <h5 class="card-title">Gestión de Personal Logístico</h5>
+                        <p class="card-text">Administrar cuentas, permisos y estados del personal de logística.</p>
                     </div>
                 </a>
             </div>
             <div class="col-md-4">
-                <a href="admin_proveedores.php" class="text-decoration-none">
-                    <div class="card text-center p-4 h-100 shadow-sm bg-light">
-                        <i class="fas fa-boxes fa-3x text-success mb-3"></i>
-                        <h5 class="card-title">Gestión de Productos</h5>
-                        <p class="card-text text-muted">Ver, editar y añadir inventario.</p>
+                <a href="admin_proveedores.php">
+                    <div class="card text-center h-100 shadow-sm">
+                        <i class="fas fa-warehouse fa-3x text-success mb-3"></i>
+                        <h5 class="card-title">Gestión de Proveedores</h5>
+                        <p class="card-text">Ver, editar y gestionar proveedores.</p>
                     </div>
                 </a>
             </div>
             <div class="col-md-4">
-                <a href="admin_reporte_ventas.php" class="text-decoration-none">
-                    <div class="card text-center p-4 h-100 shadow-sm bg-light">
-                        <i class="fas fa-chart-bar fa-3x text-danger mb-3"></i>
-                        <h5 class="card-title">Reportes Financieros</h5>
-                        <p class="card-text text-muted">Gestión de Proveedores, Detalle del Proveedor y Historial de Ingresos.</p>
+                <a href="admin_reporte_ventas.php">
+                    <div class="card text-center h-100 shadow-sm">
+                        <i class="fas fa-chart-line fa-3x text-danger mb-3"></i>
+                        <h5 class="card-title">Reportes y Análisis Financiero</h5>
+                        <p class="card-text">Generar reportes detallados de ventas y rendimiento.</p>
                     </div>
                 </a>
             </div>
         </div>
-
-    </div>
+        </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
-<script src="https://kit.fontawesome.com/your-font-awesome-kit.js" crossorigin="anonymous"></script>
 </body>
 </html>

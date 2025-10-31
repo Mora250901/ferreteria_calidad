@@ -89,7 +89,7 @@ if ($ingreso_data['metodo_pago'] === 'credito' && $ingreso_data['fecha_pago'] !=
 ?>
 
 <div class="modal-header bg-success text-white">
-    <h5 class="modal-title" id="boletaModalLabel"><i class="fas fa-file-alt me-2"></i> Comprobante de Ingreso: **<?php echo htmlspecialchars($ingreso_data['numero_factura']); ?>**</h5>
+    <h5 class="modal-title" id="boletaModalLabel"><i class="fas fa-file-alt me-2"></i> Comprobante de Ingreso: <?php echo htmlspecialchars($ingreso_data['numero_factura']); ?></h5>
     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
 </div>
 <div class="modal-body">

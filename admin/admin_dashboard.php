@@ -69,9 +69,9 @@ if (isset($_GET['search']) && !empty(trim($_GET['search']))) {
 
 // Consulta base para obtener todos los usuarios logísticos.
 $sql = "SELECT id_usuario, usuario, email, telefono, estado, fecha_registro
-         FROM usuarios
-         WHERE rol = 'logistico'" . $search_query . "
-         ORDER BY estado ASC, fecha_registro DESC"; 
+          FROM usuarios
+          WHERE rol = 'logistico'" . $search_query . "
+          ORDER BY estado ASC, fecha_registro DESC"; 
 
 // Preparar y ejecutar la consulta
 $stmt = $conn->prepare($sql);
@@ -95,176 +95,253 @@ $result = $stmt->get_result();
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="../assets/css/styles.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    
     <style>
-        /* Estilos básicos para la estructura del Dashboard */
+        :root {
+            --primary-color: #dc3545; /* Rojo/Danger */
+            --success-color: #198754; /* Verde/Success */
+            --warning-color: #ffc107; /* Amarillo/Warning */
+            --info-color: #0dcaf0; /* Azul claro/Info */
+            --secondary-color: #6c757d; /* Gris/Secondary */
+            --dark-color: #212529; /* Negro/Dark */
+            --bs-blue: #0d6efd; /* Azul por defecto de Bootstrap */
+        }
+
+        body {
+            /* Fondo limpio y moderno */
+            background: linear-gradient(135deg, #f5f7fa 0%, #e9ecef 100%);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            min-height: 100vh;
+        }
+
+        /* Estilos del Sidebar (adaptados) */
         .sidebar {
             width: 250px;
             height: 100vh;
             position: fixed;
-            background-color: #343a40; /* Fondo oscuro tipo dashboard */
+            background-color: var(--dark-color); /* Fondo oscuro para contraste */
             padding-top: 15px;
+            box-shadow: 2px 0 10px rgba(0, 0, 0, 0.2);
         }
         .sidebar a {
             color: #adb5bd;
-            padding: 10px 15px;
+            padding: 12px 15px;
             text-decoration: none;
             display: block;
+            border-radius: 8px;
+            margin: 5px 10px;
         }
-        .sidebar a:hover {
-            background-color: #495057;
-            color: #fff;
-        }
-        /* ⭐ Estilo para que el enlace de Agregar se vea como un botón/link del menú ⭐ */
-        .sidebar .add-link-style {
-            color: #adb5bd; 
-        }
-        .sidebar .add-link-style:hover {
-            color: #fff;
-            background-color: #495057; 
-        }
-        .sidebar .active-link {
+        .sidebar a:hover, .sidebar .active-link {
             background-color: #495057;
             color: #fff;
             font-weight: bold;
         }
         .main-content {
-            margin-left: 250px; /* Offset para el sidebar */
-            padding: 20px;
+            margin-left: 250px; 
+            padding: 30px; /* Mayor padding para un look más espacioso */
         }
-        .status-badge {
-            font-weight: bold;
-            padding: .4em .8em;
-            border-radius: .25rem;
+        
+        /* Estilos para la tabla y la tarjeta principal */
+        .data-card {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 4px 15px rgba(0,0,0,.08);
+            overflow: hidden; /* Para que la tabla interna respete el border-radius */
+            border: none;
+        }
+        .data-card .card-header {
+            background-color: var(--bs-blue); /* Azul fuerte para el encabezado de tabla */
             color: white;
+            font-size: 1.1rem;
+            font-weight: 600;
+            padding: 1rem 1.5rem;
         }
-        .status-activo { background-color: #198754; } /* Verde */
-        .status-suspendido { background-color: #ffc107; color: #343a40; } /* Amarillo */
-        .status-eliminado { background-color: #dc3545; } /* Rojo */
+        .table thead th {
+            border-bottom: 2px solid #e9ecef;
+            color: var(--secondary-color);
+            text-transform: uppercase;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+        .table tbody tr:hover {
+            background-color: #f8f9fa;
+        }
+        
+        /* Estilos de los Badges (Mejorados) */
+        .status-badge {
+            font-weight: 600;
+            padding: .4em .8em;
+            border-radius: 12px; /* Más redondeado */
+            color: white;
+            display: inline-block;
+            min-width: 90px;
+            text-align: center;
+        }
+        .status-activo { background-color: var(--success-color); } /* Verde */
+        .status-suspendido { background-color: var(--warning-color); color: var(--dark-color); } /* Amarillo */
+        .status-eliminado { background-color: var(--primary-color); } /* Rojo */
+
+        /* Estilos de botones de acción */
+        .btn-sm {
+            padding: 0.3rem 0.6rem;
+            font-size: 0.85rem;
+            border-radius: 8px;
+            font-weight: 500;
+        }
+        
+        /* Estilo para la barra de búsqueda */
+        .search-form-container {
+            background: white;
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 15px rgba(0,0,0,.05);
+        }
     </style>
-</head>
+    </head>
 <body>
 
 <div class="d-flex">
     <div class="sidebar">
-        <h4 class="text-white text-center mb-4">ADMIN PANEL</h4>
-        <p class="text-secondary text-center">Bienvenido, <?php echo htmlspecialchars($_SESSION['usuario_data']['usuario'] ?? 'Admin'); ?></p>
-        <hr class="text-white-50">
+        <h4 class="text-white text-center mb-4 mt-2">ADMIN PANEL 📊</h4>
+        <p class="text-secondary text-center small border-bottom border-secondary pb-3 mx-3">Bienvenido, <?php echo htmlspecialchars($_SESSION['usuario_data']['usuario'] ?? 'Admin'); ?></p>
+        
         <ul class="list-unstyled components">
-            <li>
-                <a href="admin_dashboard_general.php" > ⚖ Dashboard General
-                </a>
-            </li>
-            
-            <li><a href="admin_dashboard.php" class="active-link">  🔑 Gestión Logístico</a></li>
+            <li><a href="admin_dashboard_general.php"> ⚖ Dashboard General</a></li>
+            <li><a href="perfil_admin.php"> 🔑 Mi Perfil</a></li>
+            <hr class="text-white-50 my-2">
+            <li><a href="admin_gestionar_admin.php" > 👑 Gestión Administradores</a></li> 
+            <li><a href="admin_dashboard.php" class="active-link"> 💼 Gestión Logístico</a></li>
             <li><a href="admin_registrar_logistico.php">📥 Agregar Nuevo Logístico</a></li>
-            <li><a href="admin_proveedores.php">👨🏽‍🤝‍👨🏻 Proveedores</a></li>          
-
-            <li><a href="admin_reporte_ventas.php">📊 Reportes de Ventas</a></li>
-            
-            <li class="mt-5"><a href="../public/logout.php" class="btn btn-danger btn-sm w-100"><i class="fas fa-sign-out-alt me-2"></i> Cerrar Sesión</a></li>
+            <hr class="text-white-50 my-2">
+            <li><a href="admin_proveedores.php">👨🏽‍🤝‍👨🏻 Proveedores</a></li>
+            <li><a href="admin_reporte_ventas.php">📈 Reportes de Ventas</a></li>
+            <li class="mt-5"><a href="../public/logout.php" class="btn btn-danger btn-sm w-75 mx-auto d-block"><i class="fas fa-sign-out-alt me-2"></i> Cerrar Sesión</a></li>
         </ul>
     </div>
 
     <div class="main-content flex-grow-1">
-        <h2 class="mb-4">Gestión de Usuarios Logístico</h2>
+        <h1 class="display-6 fw-bold text-dark mb-4">Gestión de Personal Logístico</h1>
+        <p class="text-secondary fs-5 mb-5">Administra, activa o suspende las cuentas de los encargados de la logística.</p>
         
         <?php 
-        // Mostrar mensajes de éxito. Se añade 'logistico_agregado' para la nueva página.
         if (isset($_GET['msg'])) {
             $msg_text = match($_GET['msg']) {
-                'suspender' => 'Usuario suspendido correctamente.',
-                'activar' => 'Usuario activado correctamente.',
-                'eliminar' => 'Usuario eliminado lógicamente.',
-                'logistico_agregado' => '¡Nuevo logístico registrado exitosamente!', // Mensaje añadido
+                'suspender' => 'Usuario **suspendido** correctamente.',
+                'activar' => 'Usuario **activado** correctamente.',
+                'eliminar' => 'Usuario **eliminado lógicamente** (desactivado permanentemente).',
+                'logistico_agregado' => '¡Nuevo logístico **registrado** exitosamente!', 
                 default => 'Acción realizada.',
             };
             echo '<div class="alert alert-success alert-dismissible fade show" role="alert">
-                      <strong>¡Éxito!</strong> ' . htmlspecialchars($msg_text) . '
+                      <strong>¡Éxito!</strong> ' . $msg_text . '
                       <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                     </div>';
         }
         ?>
 
-        <form class="row row-cols-lg-auto g-3 align-items-center mb-4" method="GET" action="admin_dashboard.php">
-            <div class="col-12">
-                <label class="visually-hidden" for="inlineFormInputGroupUsername">Nombre</label>
-                <div class="input-group">
-                    <div class="input-group-text"><i class="fas fa-search"></i></div>
-                    <input type="text" class="form-control" id="inlineFormInputGroupUsername" 
-                           placeholder="Buscar por Nombre de Logístico" name="search"
-                           value="<?php echo htmlspecialchars($search_term); ?>">
+        <div class="search-form-container">
+             <form class="row align-items-center g-3" method="GET" action="admin_dashboard.php">
+                <div class="col-md-9">
+                    <label class="visually-hidden" for="search_input">Nombre Logístico</label>
+                    <div class="input-group">
+                        <span class="input-group-text bg-light"><i class="fas fa-search text-secondary"></i></span>
+                        <input type="text" class="form-control form-control-lg" id="search_input" 
+                               placeholder="Buscar por nombre de usuario o correo..." name="search"
+                               value="<?php echo htmlspecialchars($search_term); ?>">
+                    </div>
+                </div>
+                <div class="col-md-3 d-flex gap-2">
+                    <button type="submit" class="btn btn-primary w-50">Buscar</button>
+                    <?php if (!empty($search_term)): ?>
+                        <a href="admin_dashboard.php" class="btn btn-outline-secondary w-50">Limpiar</a>
+                    <?php endif; ?>
+                </div>
+            </form>
+        </div>
+        <div class="card data-card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <i class="fas fa-list-alt me-2"></i> Listado Completo de Logísticos
+                <a href="admin_registrar_logistico.php" class="btn btn-sm btn-light text-primary fw-bold"><i class="fas fa-user-plus me-1"></i> Añadir Nuevo</a>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th class="ps-4">ID</th>
+                                <th>Usuario</th>
+                                <th>Email</th>
+                                <th>Teléfono</th>
+                                <th>Registro</th>
+                                <th>Estado</th>
+                                <th class="text-center">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php 
+                            if ($result->num_rows > 0) {
+                                while ($row = $result->fetch_assoc()) { 
+                                    // Determinar la clase del badge
+                                    $estado_class = 'status-' . strtolower($row['estado']);
+                                    // Codificar el término de búsqueda para mantenerlo en los enlaces de acción
+                                    $current_search = !empty($search_term) ? "&search=" . urlencode($search_term) : "";
+                                    ?>
+                                    <tr>
+                                        <td class="ps-4 text-muted"><?php echo $row['id_usuario']; ?></td>
+                                        <td class="fw-bold"><?php echo htmlspecialchars($row['usuario']); ?></td>
+                                        <td><?php echo htmlspecialchars($row['email']); ?></td>
+                                        <td><?php echo htmlspecialchars($row['telefono']); ?></td>
+                                        <td><?php echo date('Y-m-d', strtotime($row['fecha_registro'])); ?></td>
+                                        <td><span class="status-badge <?php echo $estado_class; ?>"><?php echo ucfirst($row['estado']); ?></span></td>
+                                        <td class="text-center">
+                                            <a href="admin_editar_logistico.php?id=<?php echo $row['id_usuario']; ?>" 
+                                               class="btn btn-outline-info btn-sm me-1" title="Editar datos">
+                                                <i class="fas fa-edit"></i>
+                                            </a>
+                                            
+                                            <?php if ($row['estado'] === 'activo'): ?>
+                                                <a href="?action=suspender&id=<?php echo $row['id_usuario'] . $current_search; ?>" 
+                                                   class="btn btn-warning btn-sm me-1" 
+                                                   title="Suspender usuario"
+                                                   onclick="return confirm('¿Seguro que deseas suspender a este usuario?');">
+                                                   <i class="fas fa-pause"></i>
+                                                </a>
+                                            <?php elseif ($row['estado'] === 'suspendido'): ?>
+                                                <a href="?action=activar&id=<?php echo $row['id_usuario'] . $current_search; ?>" 
+                                                   class="btn btn-success btn-sm me-1"
+                                                   title="Activar usuario">
+                                                   <i class="fas fa-play"></i>
+                                                </a>
+                                            <?php endif; ?>
+
+                                            <?php if ($row['estado'] !== 'eliminado'): ?>
+                                                <a href="?action=eliminar&id=<?php echo $row['id_usuario'] . $current_search; ?>" 
+                                                   class="btn btn-danger btn-sm" 
+                                                   title="Eliminar lógicamente"
+                                                   onclick="return confirm('ATENCIÓN: ¿Seguro que deseas ELIMINAR logicamente a este usuario? Esto lo deshabilitará permanentemente.');">
+                                                   <i class="fas fa-trash-alt"></i>
+                                                </a>
+                                            <?php endif; ?>
+                                        </td>
+                                    </tr>
+                                <?php }
+                            } else {
+                                echo '<tr><td colspan="7" class="text-center p-5">
+                                    <i class="fas fa-box-open fa-3x text-secondary mb-3"></i>
+                                    <h4 class="text-muted">No se encontraron usuarios logísticos</h4>
+                                    <p class="text-secondary">Intenta con otro término de búsqueda o registra uno nuevo.</p>
+                                    </td></tr>';
+                            }
+                            ?>
+                        </tbody>
+                    </table>
                 </div>
             </div>
-            <div class="col-12">
-                <button type="submit" class="btn btn-primary">Buscar</button>
-                <?php if (!empty($search_term)): ?>
-                    <a href="admin_dashboard.php" class="btn btn-secondary">Limpiar Filtro</a>
-                <?php endif; ?>
-            </div>
-        </form>
-        <div class="card shadow">
-            <div class="card-header bg-primary text-white">
-                Lista de Personal de Logística
-            </div>
-            <div class="card-body">
-                <table class="table table-striped table-hover align-middle">
-                    <thead>
-                        <tr>
-                            <th>ID</th>
-                            <th>Usuario</th>
-                            <th>Email</th>
-                            <th>Teléfono</th>
-                            <th>Fecha Registro</th>
-                            <th>Estado</th>
-                            <th>Acciones</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php 
-                        if ($result->num_rows > 0) {
-                            while ($row = $result->fetch_assoc()) { 
-                                // Determinar la clase del badge
-                                $estado_class = 'status-' . strtolower($row['estado']);
-                                // Codificar el término de búsqueda para mantenerlo en los enlaces de acción
-                                $current_search = !empty($search_term) ? "&search=" . urlencode($search_term) : "";
-                                ?>
-                                <tr>
-                                    <td><?php echo $row['id_usuario']; ?></td>
-                                    <td><?php echo htmlspecialchars($row['usuario']); ?></td>
-                                    <td><?php echo htmlspecialchars($row['email']); ?></td>
-                                    <td><?php echo htmlspecialchars($row['telefono']); ?></td>
-                                    <td><?php echo date('Y-m-d', strtotime($row['fecha_registro'])); ?></td>
-                                    <td><span class="status-badge <?php echo $estado_class; ?>"><?php echo ucfirst($row['estado']); ?></span></td>
-                                    <td>
-                                        <?php if ($row['estado'] === 'activo'): ?>
-                                            <a href="?action=suspender&id=<?php echo $row['id_usuario'] . $current_search; ?>" 
-                                                class="btn btn-warning btn-sm" 
-                                                onclick="return confirm('¿Seguro que deseas suspender a este usuario?');">Suspender</a>
-                                        <?php elseif ($row['estado'] === 'suspendido'): ?>
-                                            <a href="?action=activar&id=<?php echo $row['id_usuario'] . $current_search; ?>" 
-                                                class="btn btn-success btn-sm">Activar</a>
-                                        <?php endif; ?>
-
-                                        <?php if ($row['estado'] !== 'eliminado'): ?>
-                                            <a href="?action=eliminar&id=<?php echo $row['id_usuario'] . $current_search; ?>" 
-                                                class="btn btn-danger btn-sm" 
-                                                onclick="return confirm('ATENCIÓN: ¿Seguro que deseas ELIMINAR logicamente a este usuario?');">Eliminar</a>
-                                        <?php endif; ?>
-                                    </td>
-                                </tr>
-                            <?php }
-                        } else {
-                            echo '<tr><td colspan="7" class="text-center">No se encontraron usuarios logísticos' . (!empty($search_term) ? ' con el nombre: <strong>' . htmlspecialchars($search_term) . '</strong>' : '') . '.</td></tr>';
-                        }
-                        ?>
-                    </tbody>
-                </table>
-            </div>
         </div>
-    </div>
+        </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
-<script src="https://kit.fontawesome.com/your-font-awesome-kit.js" crossorigin="anonymous"></script> 
 </body>
 </html>
