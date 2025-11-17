@@ -52,7 +52,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     if ($_POST['action'] === 'get_atributos_producto' && isset($_POST['id_catalogo'])) {
         $id_catalogo = (int)$_POST['id_catalogo'];
         
-        $sqlProducto = "SELECT cp.*, cp.id_categoria, c.nombre_categoria, a.nombre_atributo, 
+        $sqlProducto = "SELECT cp.*, cp.id_categoria, cp.id_proveedor, c.nombre_categoria, a.nombre_atributo, 
                                GROUP_CONCAT(DISTINCT 
                                    CASE 
                                        WHEN cpa.valor_texto IS NOT NULL THEN cpa.valor_texto
@@ -85,7 +85,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     'marca' => $row['marca'],
                     'precio_compra' => $row['precio_compra'],
                     'categoria' => $row['nombre_categoria'],
-                    'id_categoria' => (int)$row['id_categoria']
+                    'id_categoria' => (int)$row['id_categoria'],
+                    'id_proveedor' => (int)$row['id_proveedor']
                 ];
             }
             
@@ -98,61 +99,54 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         }
         $st->close();
 
-<<<<<<< Updated upstream
-        // Buscar si ya existe un producto y calcular stock TOTAL
+        // Calcular stock TOTAL sumando ingresos de inventario
         $producto_stock = 0;
         if ($producto) {
-            $sqlExist = "SELECT p.id_producto, p.stock,
-                                COALESCE((
-                                    SELECT SUM(cip.cantidad) 
-                                    FROM catalogo_ingresos_pending cip 
-                                    INNER JOIN catalogo_proveedor cp ON cip.id_catalogo = cp.id_catalogo 
-                                    WHERE cp.nombre_producto = p.nombre_producto AND cp.id_categoria = p.id_categoria
-                                ), 0) AS stock_pendiente,
-                                COALESCE((
-                                    SELECT SUM(dc.cantidad) 
-                                    FROM detalle_compras dc 
-                                    WHERE dc.id_producto = p.id_producto
-                                ), 0) AS stock_compras
+            // 1) Stock de ingresos de inventario (nuevos ingresos)
+            $sqlIngresos = "SELECT COALESCE(SUM(iid.cantidad), 0) AS stock_ingresos
+                            FROM ingreso_inventario_detalle iid
+                            WHERE iid.id_proveedor = ? 
+                            AND iid.id_categoria = ? 
+                            AND iid.nombre_producto = ?";
+            $stIng = $conn->prepare($sqlIngresos);
+            $stIng->bind_param("iis", $producto['id_proveedor'], $producto['id_categoria'], $producto['nombre_producto']);
+            $stIng->execute();
+            $resIng = $stIng->get_result();
+            if ($rIng = $resIng->fetch_assoc()) {
+                $producto_stock += (int)$rIng['stock_ingresos'];
+            }
+            $stIng->close();
+
+            // 2) Verificar si ya existe como producto y sumar su stock
+            $sqlExist = "SELECT p.id_producto, p.stock
                         FROM productos p 
                         WHERE p.nombre_producto = ? AND p.id_categoria = ? 
                         LIMIT 1";
-=======
-        // Buscar si ya existe un producto en tabla productos con mismo nombre y categoría
-        $producto_stock = 0;
-        if ($producto) {
-            $sqlExist = "SELECT id_producto, stock FROM productos WHERE nombre_producto = ? AND id_categoria = ? LIMIT 1";
->>>>>>> Stashed changes
             $stEx = $conn->prepare($sqlExist);
             $stEx->bind_param("si", $producto['nombre_producto'], $producto['id_categoria']);
             $stEx->execute();
             $resEx = $stEx->get_result();
-<<<<<<< Updated upstream
             
             if ($rEx = $resEx->fetch_assoc()) {
-                // Producto EXISTE: sumar todo
                 $producto['id_producto'] = (int)$rEx['id_producto'];
-                $producto_stock = (int)$rEx['stock'] + (int)$rEx['stock_pendiente'] + (int)$rEx['stock_compras'];
-            } else {
-                // Producto NO EXISTE: solo sumar pendientes de este catálogo
-                $sqlPendientes = "SELECT COALESCE(SUM(cip.cantidad), 0) AS total_pendientes 
-                                  FROM catalogo_ingresos_pending cip 
-                                  WHERE cip.id_catalogo = ?";
-                $stPen = $conn->prepare($sqlPendientes);
-                $stPen->bind_param("i", $id_catalogo);
-                $stPen->execute();
-                $resPen = $stPen->get_result();
-                if ($rPen = $resPen->fetch_assoc()) {
-                    $producto_stock = (int)$rPen['total_pendientes'];
-                }
-                $stPen->close();
-=======
-            if ($rEx = $resEx->fetch_assoc()) {
-                $producto['id_producto'] = (int)$rEx['id_producto'];
-                $producto_stock = (int)$rEx['stock'];
->>>>>>> Stashed changes
+                $producto_stock += (int)$rEx['stock'];
             }
             $stEx->close();
+
+            // 3) Sumar compras directas (si existen)
+            if (isset($producto['id_producto'])) {
+                $sqlCompras = "SELECT COALESCE(SUM(dc.cantidad), 0) AS stock_compras
+                              FROM detalle_compras dc 
+                              WHERE dc.id_producto = ?";
+                $stComp = $conn->prepare($sqlCompras);
+                $stComp->bind_param("i", $producto['id_producto']);
+                $stComp->execute();
+                $resComp = $stComp->get_result();
+                if ($rComp = $resComp->fetch_assoc()) {
+                    $producto_stock += (int)$rComp['stock_compras'];
+                }
+                $stComp->close();
+            }
         }
 
         // añadir stock al response

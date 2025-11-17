@@ -448,6 +448,7 @@ if ($categoria > 0) {
             }
         }
     </style>
+    <link rel="stylesheet" href="../assets/chatbot/chatbot.css">
 </head>
 <body>
 
@@ -697,5 +698,7 @@ if (window.location.search && document.querySelector('.products-section')) {
     }, 100);
 }
 </script>
+
+<script src="../assets/chatbot/chatbot.js"></script>
 </body>
 </html>

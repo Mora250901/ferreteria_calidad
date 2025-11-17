@@ -16,7 +16,6 @@ if (!isset($u['rol']) || $u['rol'] !== 'logistico') {
 function str($s){ return trim((string)$s); }
 
 // --------------------
-<<<<<<< Updated upstream
 // Procesar NUEVO formulario de ingreso múltiple
 // --------------------
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'registrar_ingreso_multiple') {
@@ -36,29 +35,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 
     if (empty($numero_factura) || empty($fecha_emision) || empty($productos)) {
         $_SESSION['msg'] = "Faltan datos obligatorios (factura, fecha o productos).";
-=======
-// Procesar formulario de ingreso desde catálogo
-// --------------------
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'registrar_ingreso') {
-    $proveedor_id = isset($_POST['proveedor_id']) ? (int)$_POST['proveedor_id'] : 0;
-    $nombre_producto = str($_POST['nombre_producto'] ?? '');
-    $marca = str($_POST['marca'] ?? '');
-    $categoria_id = isset($_POST['categoria_id']) ? (int)$_POST['categoria_id'] : 0;
-    $precio_compra = isset($_POST['precio_compra']) ? (float)$_POST['precio_compra'] : 0.0;
-    $cantidad = isset($_POST['cantidad']) ? (int)$_POST['cantidad'] : 0;
-    $activo = isset($_POST['activo']) ? 1 : 0;
-    $atributos_recibidos = $_POST['atributos'] ?? [];
-
-    if ($proveedor_id <= 0 || $categoria_id <= 0 || $nombre_producto === '' || $cantidad <= 0 || $precio_compra <= 0) {
-        $_SESSION['msg'] = "Faltan datos obligatorios (proveedor/categoría/producto/precio/cantidad).";
->>>>>>> Stashed changes
         header("Location: ".$_SERVER['REQUEST_URI']);
         exit;
     }
 
     $conn->begin_transaction();
     try {
-<<<<<<< Updated upstream
         // 1) Registrar el ingreso principal
         $sqlIngreso = "INSERT INTO ingresos_inventario (numero_factura, fecha_ingreso, fecha_emision, metodo_pago, dias_credito, fecha_pago, subtotal, igv, total, observaciones, id_usuario) 
                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
@@ -139,126 +121,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                     $insCat->close();
                 }
                 $stCheck->close();
-=======
-        // 1) Crear/actualizar catálogo del proveedor
-        $id_catalogo = null;
-        $sqlCheck = "SELECT id_catalogo FROM catalogo_proveedor WHERE id_proveedor = ? AND id_categoria = ? AND nombre_producto = ?";
-        $st = $conn->prepare($sqlCheck);
-        $st->bind_param("iis", $proveedor_id, $categoria_id, $nombre_producto);
-        $st->execute();
-        $res = $st->get_result();
-        if ($row = $res->fetch_assoc()) {
-            $id_catalogo = (int)$row['id_catalogo'];
-            $upd = $conn->prepare("UPDATE catalogo_proveedor SET precio_compra = ?, marca = ?, activo = ? WHERE id_catalogo = ?");
-            $upd->bind_param("dsii", $precio_compra, $marca, $activo, $id_catalogo);
-            $upd->execute();
-            $upd->close();
-        } else {
-            $sqlInsCat = "INSERT INTO catalogo_proveedor (id_proveedor, id_categoria, nombre_producto, marca, precio_compra, activo) VALUES (?, ?, ?, ?, ?, ?)";
-            $st2 = $conn->prepare($sqlInsCat);
-            $st2->bind_param("iissdi", $proveedor_id, $categoria_id, $nombre_producto, $marca, $precio_compra, $activo);
-            $st2->execute();
-            $id_catalogo = $st2->insert_id;
-            $st2->close();
-        }
-        $st->close();
-
-        // 2) NO crear producto automáticamente.
-        // Buscamos producto existente con mismo nombre + categoria
-        $id_producto = null;
-        $sqlCheckProd = "SELECT id_producto FROM productos WHERE nombre_producto = ? AND id_categoria = ? LIMIT 1";
-        $stp = $conn->prepare($sqlCheckProd);
-        $stp->bind_param("si", $nombre_producto, $categoria_id);
-        $stp->execute();
-        $rp = $stp->get_result();
-        if ($rprod = $rp->fetch_assoc()) {
-            $id_producto = (int)$rprod['id_producto'];
-        }
-        $stp->close();
-
-        // 3) Si existe producto, update producto_proveedor y sumar stock.
-        if ($id_producto !== null) {
-            $sqlCheckRel = "SELECT id_relacion FROM producto_proveedor WHERE id_producto = ? AND id_proveedor = ?";
-            $str = $conn->prepare($sqlCheckRel);
-            $str->bind_param("ii", $id_producto, $proveedor_id);
-            $str->execute();
-            $rr = $str->get_result();
-            if (!$rr->fetch_assoc()) {
-                $insRel = $conn->prepare("INSERT INTO producto_proveedor (id_producto, id_proveedor, precio_compra) VALUES (?, ?, ?)");
-                $insRel->bind_param("iid", $id_producto, $proveedor_id, $precio_compra);
-                $insRel->execute();
-                $insRel->close();
-            } else {
-                $updRel = $conn->prepare("UPDATE producto_proveedor SET precio_compra = ? WHERE id_producto = ? AND id_proveedor = ?");
-                $updRel->bind_param("dii", $precio_compra, $id_producto, $proveedor_id);
-                $updRel->execute();
-                $updRel->close();
-            }
-            $str->close();
-
-            $updStock = $conn->prepare("UPDATE productos SET stock = stock + ? WHERE id_producto = ?");
-            $updStock->bind_param("ii", $cantidad, $id_producto);
-            $updStock->execute();
-            $updStock->close();
-            $appliedStock = true;
-        } else {
-            // No existe producto: guardar ingreso como pendiente para aplicar cuando se cree el producto
-            $insPend = $conn->prepare("INSERT INTO catalogo_ingresos_pending (id_catalogo, cantidad, precio_compra, id_usuario, comentario) VALUES (?, ?, ?, ?, ?)");
-            $usuario_id = $u['id_usuario'] ?? null;
-            $coment = "Ingreso desde catálogo (producto no existente)";
-            $insPend->bind_param("iiids", $id_catalogo, $cantidad, $precio_compra, $usuario_id, $coment);
-            // bind_param types: i i d i s — ajustar: use explicit query to avoid type mismatch
-            $conn->query("INSERT INTO catalogo_ingresos_pending (id_catalogo, cantidad, precio_compra, id_usuario, comentario)
-                        VALUES (".intval($id_catalogo).", ".intval($cantidad).", ".floatval($precio_compra).", ".intval($usuario_id).", '".$conn->real_escape_string($coment)."')");
-            $appliedStock = false;
-        }
-
-        // 4) Guardar atributos en catalogo_proveedor_atributos (y en productos_atributos si existe producto)
-        foreach ($atributos_recibidos as $id_atributo => $valores_array) {
-            if (!is_array($valores_array)) continue;
-            foreach ($valores_array as $v) {
-                $v = trim((string)$v);
-                if ($v === '') continue;
-                $q = $conn->prepare("SELECT tipo_atributo FROM atributos WHERE id_atributo = ? LIMIT 1");
-                $q->bind_param("i", $id_atributo);
-                $q->execute();
-                $rrt = $q->get_result();
-                $tipo = 'texto';
-                if ($rtt = $rrt->fetch_assoc()) $tipo = $rtt['tipo_atributo'];
-                $q->close();
-
-                $val_text = ($tipo === 'texto' || $tipo === 'fecha') ? $conn->real_escape_string($v) : null;
-                $val_num = ($tipo === 'numero') ? (int)$v : null;
-                $val_dec = ($tipo === 'decimal') ? (float)$v : null;
-                $val_bool = ($tipo === 'booleano') ? ((int)(bool)$v) : null;
-                $val_fecha = ($tipo === 'fecha') ? $conn->real_escape_string($v) : null;
-
-                $conn->query("REPLACE INTO catalogo_proveedor_atributos
-                    (id_catalogo, id_atributo, valor_texto, valor_numero, valor_decimal, valor_booleano, valor_fecha)
-                    VALUES (".intval($id_catalogo).", ".intval($id_atributo).", ".($val_text !== null ? "'".$conn->real_escape_string($val_text)."'" : "NULL").", ".($val_num !== null ? intval($val_num) : "NULL").", ".($val_dec !== null ? floatval($val_dec) : "NULL").", ".($val_bool !== null ? intval($val_bool) : "NULL").", ".($val_fecha !== null ? "'".$conn->real_escape_string($val_fecha)."'" : "NULL").")");
-
-                if ($id_producto !== null) {
-                    $conn->query("REPLACE INTO productos_atributos
-                        (id_producto, id_atributo, valor_texto, valor_numero, valor_decimal, valor_booleano, valor_fecha)
-                        VALUES (".intval($id_producto).", ".intval($id_atributo).", ".($val_text !== null ? "'".$conn->real_escape_string($val_text)."'" : "NULL").", ".($val_num !== null ? intval($val_num) : "NULL").", ".($val_dec !== null ? floatval($val_dec) : "NULL").", ".($val_bool !== null ? intval($val_bool) : "NULL").", ".($val_fecha !== null ? "'".$conn->real_escape_string($val_fecha)."'" : "NULL").")");
-                }
->>>>>>> Stashed changes
             }
         }
 
         $conn->commit();
-<<<<<<< Updated upstream
         $_SESSION['msg'] = "Ingreso de inventario registrado correctamente con " . count($productos) . " productos.";
         header("Location: ".$_SERVER['PHP_SELF']);
-=======
-
-        if ($appliedStock) {
-            $_SESSION['msg'] = "Ingreso registrado correctamente. Stock actualizado (producto existente).";
-        } else {
-            $_SESSION['msg'] = "Catálogo creado/actualizado. No existe producto en inventario con ese nombre+categoría: NO se aplicó stock. Crea manualmente el producto en Módulo Productos para que el stock pueda aplicarse.";
-        }
-        header("Location: ".$_SERVER['PHP_SELF']."?proveedor_id=".$proveedor_id);
->>>>>>> Stashed changes
         exit;
     } catch (Exception $e) {
         $conn->rollback();
@@ -269,7 +137,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 }
 
 // --------------------
-<<<<<<< Updated upstream
 // Obtener datos para la vista
 // --------------------
 
@@ -289,48 +156,6 @@ $ingresos = $conn->query("SELECT ii.*, u.usuario as usuario_registro
                          LIMIT 50");
 $ingresos = $ingresos->fetch_all(MYSQLI_ASSOC);
 
-=======
-// Fin procesamiento
-// --------------------
-
-// Obtener proveedores
-$proveedores = $conn->query("SELECT id_proveedor, nombre_proveedor FROM proveedores ORDER BY nombre_proveedor");
-$proveedores = $proveedores->fetch_all(MYSQLI_ASSOC);
-
-// Categorías: se cargan SOLO si hay proveedor seleccionado
-$categorias = [];
-if (!empty($_GET["proveedor_id"])) {
-    $proveedor_id = (int)$_GET["proveedor_id"];
-
-    $sql = "SELECT c.id_categoria, c.nombre_categoria
-            FROM proveedor_categoria pc
-            INNER JOIN categorias c ON pc.id_categoria = c.id_categoria
-            WHERE pc.id_proveedor = ?
-            ORDER BY c.nombre_categoria";
-    $stmt = $conn->prepare($sql);
-    $stmt->bind_param("i", $proveedor_id);
-    $stmt->execute();
-    $categorias = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
-}
-
-// Catálogo del proveedor (productos que ofrece)
-$catalogoProveedor = [];
-if (!empty($_GET["proveedor_id"])) {
-    $proveedor_id = (int)$_GET["proveedor_id"];
-
-    $sql = "SELECT cp.id_catalogo, cp.nombre_producto, cp.marca, cp.activo, cp.fecha_registro,
-                   cp.precio_compra,
-                   c.nombre_categoria
-            FROM catalogo_proveedor cp
-            INNER JOIN categorias c ON cp.id_categoria = c.id_categoria
-            WHERE cp.id_proveedor = ?
-            ORDER BY cp.fecha_registro DESC";
-    $stmt = $conn->prepare($sql);
-    $stmt->bind_param("i", $proveedor_id);
-    $stmt->execute();
-    $catalogoProveedor = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
-}
->>>>>>> Stashed changes
 ?>
 <!doctype html>
 <html lang="es">
@@ -345,10 +170,7 @@ if (!empty($_GET["proveedor_id"])) {
 
 <style>
 /* Mantengo tus estilos originales y completo algunos detalles */
-<<<<<<< Updated upstream
 .fila-seleccionada { background-color: #e3f2fd !important; border-left: 4px solid #0d6efd !important; }
-=======
->>>>>>> Stashed changes
 body.claro { background:#f8f9fa; color:#212529; }
 body.oscuro { background:#212529; color:#f8f9fa; }
 .sidebar{ width:250px; position:fixed; top:0; bottom:0; left:0; padding-top:60px; z-index:1000; transition:.3s; }
@@ -374,13 +196,9 @@ body.oscuro .atributo-multiple { background: #2c3034; border-color: #495057; }
 
 /* Extras UI */
 .table thead th { vertical-align: middle; }
-<<<<<<< Updated upstream
 .modal-xl { max-width: 95%; }
 .fila-seleccionada { background-color: #e3f2fd !important; }
 .checkbox-container { max-height: 200px; overflow-y: auto; border: 1px solid #dee2e6; border-radius: 0.375rem; padding: 10px; }
-=======
-.modal-lg { max-width: 900px; }
->>>>>>> Stashed changes
 </style>
 </head>
 <body class="<?= htmlspecialchars($tema_usuario) ?>">
@@ -391,11 +209,7 @@ body.oscuro .atributo-multiple { background: #2c3034; border-color: #495057; }
 
     <!-- Contenido principal -->
     <div class="main-content w-100">
-<<<<<<< Updated upstream
         <h2 class="mb-4">Gestión de Inventario</h2>
-=======
-        <h2 class="mb-4">Catálogo / Ingreso por Inventario</h2>
->>>>>>> Stashed changes
 
         <!-- Mensajes -->
         <?php if(isset($_SESSION['msg'])): ?>
@@ -405,18 +219,19 @@ body.oscuro .atributo-multiple { background: #2c3034; border-color: #495057; }
             </div>
         <?php endif; ?>
 
-<<<<<<< Updated upstream
         <!-- Botones principales -->
         <div class="card mb-4">
             <div class="card-header d-flex justify-content-between align-items-center">
                 <h5 class="mb-0">Ingresos de Inventario</h5>
                 <div>
+                    <!-- 
                     <button class="btn btn-success me-2">
                         <i class="fa fa-file-export"></i> Exportar
                     </button>
                     <button class="btn btn-primary me-2">
                         <i class="fa fa-file-import"></i> Importar
                     </button>
+                    -->
                     <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#modalNuevoIngreso">
                         <i class="fa fa-plus"></i> Nuevo Ingreso
                     </button>
@@ -440,56 +255,11 @@ body.oscuro .atributo-multiple { background: #2c3034; border-color: #495057; }
                             <th>Método Pago</th>
                             <th>Total</th>
                             <th>Usuario</th>
-=======
-        <!-- Selección de proveedor -->
-        <form method="get" class="row g-3 mb-4">
-            <div class="col-md-6">
-                <label class="form-label">Proveedor</label>
-                <select name="proveedor_id" class="form-select" required>
-                    <option value="">Seleccione un proveedor...</option>
-                    <?php foreach ($proveedores as $p): ?>
-                        <option value="<?= $p['id_proveedor'] ?>" <?= (isset($_GET["proveedor_id"]) && $_GET["proveedor_id"] == $p['id_proveedor']) ? "selected" : "" ?>>
-                            <?= htmlspecialchars($p['nombre_proveedor']) ?>
-                        </option>
-                    <?php endforeach; ?>
-                </select>
-            </div>
-            <div class="col-md-2 d-flex align-items-end">
-                <button type="submit" class="btn btn-primary w-100"><i class="fa fa-search"></i> Ver</button>
-            </div>
-        </form>
-
-        <!-- Tabla del catálogo -->
-        <?php if (!empty($_GET["proveedor_id"])): ?>
-        <div class="card">
-            <div class="card-header d-flex justify-content-between align-items-center gap-2">
-                <div>
-                    <button class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#modalAgregar">
-                        <i class="fa fa-plus"></i> Nuevo ingreso / item
-                    </button>
-                    <span class="ms-3">Productos que distribuye este proveedor</span>
-                </div>
-                <div>
-                    <!-- botones extras si quieres exportar en un futuro -->
-                </div>
-            </div>
-            <div class="card-body">
-                <table id="tablaCatalogo" class="table table-bordered table-striped">
-                    <thead>
-                        <tr>
-                            <th>ID</th>
-                            <th>Producto</th>
-                            <th>Marca</th>
-                            <th>Categoría</th>
-                            <th>Precio Compra</th>
-                            <th>Activo</th>
->>>>>>> Stashed changes
                             <th>Registro</th>
                             <th>Acciones</th>
                         </tr>
                     </thead>
                     <tbody>
-<<<<<<< Updated upstream
                         <?php foreach ($ingresos as $ingreso): ?>
                         <tr>
                             <td><?= $ingreso['id_ingreso'] ?></td>
@@ -508,33 +278,6 @@ body.oscuro .atributo-multiple { background: #2c3034; border-color: #495057; }
                                 <button class="btn btn-sm btn-info btn-ver-ingreso" data-id="<?= $ingreso['id_ingreso'] ?>">
                                     <i class="fa fa-eye"></i> Ver
                                 </button>
-=======
-                        <?php foreach ($catalogoProveedor as $cp): ?>
-                        <tr>
-                            <td><?= $cp['id_catalogo'] ?></td>
-                            <td><?= htmlspecialchars($cp['nombre_producto']) ?></td>
-                            <td><?= htmlspecialchars($cp['marca']) ?></td>
-                            <td><?= htmlspecialchars($cp['nombre_categoria']) ?></td>
-                            <td>S/ <?= number_format($cp['precio_compra'], 2) ?></td>
-                            <td><?= $cp['activo'] ? '<span class="badge bg-success">Activo</span>' : '<span class="badge bg-secondary">Inactivo</span>' ?></td>
-                            <td><?= date('d/m/Y', strtotime($cp['fecha_registro'])) ?></td>
-                            <td>
-                                <!-- Registrar ingreso con el mismo item del catálogo -->
-                                <button class="btn btn-sm btn-primary btn-abrir-ingreso"
-                                    data-id="<?= $cp['id_catalogo'] ?>"
-                                    data-nombre="<?= htmlspecialchars($cp['nombre_producto'], ENT_QUOTES) ?>"
-                                    data-precio="<?= $cp['precio_compra'] ?>"
-                                    ><i class="fa fa-box"></i> Ingresar</button>
-
-                                <!-- Editar catálogo (abre modal con datos) -->
-                                <a href="catalogo_editar.php?id=<?= $cp['id_catalogo'] ?>" class="btn btn-sm btn-warning"><i class="fa fa-edit"></i></a>
-
-                                <!-- Eliminar -->
-                                <a href="catalogo_eliminar.php?id=<?= $cp['id_catalogo'] ?>&proveedor_id=<?= $_GET['proveedor_id'] ?>"
-                                   class="btn btn-danger btn-sm" onclick="return confirm('¿Eliminar item del catálogo?')">
-                                   <i class="fa fa-trash"></i>
-                                </a>
->>>>>>> Stashed changes
                             </td>
                         </tr>
                         <?php endforeach; ?>
@@ -542,7 +285,6 @@ body.oscuro .atributo-multiple { background: #2c3034; border-color: #495057; }
                 </table>
             </div>
         </div>
-<<<<<<< Updated upstream
 
         <!-- Modal: Nuevo Ingreso (PANTALLA COMPLETA) -->
         <div class="modal fade" id="modalNuevoIngreso" tabindex="-1">
@@ -681,96 +423,140 @@ body.oscuro .atributo-multiple { background: #2c3034; border-color: #495057; }
                             <button type="submit" class="btn btn-success" id="btnGuardarIngreso">
                                 <i class="fa fa-save"></i> Guardar Ingreso
                             </button>
-=======
-        <?php endif; ?>
-
-        <!-- Modal: Crear / Registrar Ingreso -->
-        <div class="modal fade" id="modalAgregar" tabindex="-1">
-            <div class="modal-dialog modal-lg">
-                <form method="post" action="<?= htmlspecialchars($_SERVER['PHP_SELF'] . (isset($_GET['proveedor_id']) ? '?proveedor_id=' . (int)$_GET['proveedor_id'] : '')) ?>" id="formCrearCatalogo">
-                    <input type="hidden" name="action" value="registrar_ingreso">
-                    <input type="hidden" name="catalogo_id" id="catalogo_id" value="">
-                    <!-- Hidden real proveedor para envío -->
-                    <input type="hidden" name="proveedor_id" id="hidden_proveedor_id" value="<?= isset($_GET['proveedor_id']) ? (int)$_GET['proveedor_id'] : '' ?>">
-                    <div class="modal-content">
-                        <div class="modal-header">
-                            <h5 class="modal-title">Crear item en catálogo / Registrar ingreso</h5>
-                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                        </div>
-                        <div class="modal-body">
-                            <div id="alertCrearCatalogo"></div>
-                            <div class="row g-3">
-                                <div class="col-md-6">
-                                    <label class="form-label">Proveedor *</label>
-                                    <select name="proveedor_disabled" id="proveedor_id" class="form-select" disabled>
-                                        <option value="">Seleccione...</option>
-                                        <?php foreach ($proveedores as $p): ?>
-                                            <option value="<?= $p['id_proveedor'] ?>" <?= (isset($_GET["proveedor_id"]) && $_GET["proveedor_id"] == $p['id_proveedor']) ? "selected" : "" ?>>
-                                                <?= htmlspecialchars($p['nombre_proveedor']) ?>
-                                            </option>
-                                        <?php endforeach; ?>
-                                    </select>
-                                </div>
-
-                                <div class="col-md-6">
-                                    <label class="form-label">Categoría *</label>
-                                    <select name="categoria_id" id="categoria_id" class="form-select" required>
-                                        <option value="">Seleccione...</option>
-                                        <?php foreach ($categorias as $c): ?>
-                                            <option value="<?= $c['id_categoria'] ?>"><?= htmlspecialchars($c['nombre_categoria']) ?></option>
-                                        <?php endforeach; ?>
-                                    </select>
-                                </div>
-
-                                <div class="col-md-8">
-                                    <label class="form-label">Nombre del producto *</label>
-                                    <input type="text" name="nombre_producto" id="nombre_producto" class="form-control" required>
-                                </div>
-                                <div class="col-md-4">
-                                    <label class="form-label">Marca</label>
-                                    <input type="text" name="marca" id="marca" class="form-control">
-                                </div>
-
-                                <div class="col-md-4">
-                                    <label class="form-label">Precio de compra (S/)*</label>
-                                    <input type="number" step="0.01" name="precio_compra" id="precio_compra" class="form-control" required>
-                                </div>
-
-                                <!-- Precio venta eliminado -->
-
-                                <div class="col-md-4">
-                                    <label class="form-label">Cantidad recibida *</label>
-                                    <input type="number" step="1" min="1" name="cantidad" id="cantidad" class="form-control" required>
-                                </div>
-
-                                <!-- Número de factura y Fecha de compra eliminados -->
-
-                                <div class="col-12">
-                                    <label class="form-label">Atributos (seleccione categoría para cargar)</label>
-                                    <div id="atributosContainer" class="border p-2" style="max-height:300px; overflow-y:auto;">
-                                        <div class="text-muted small">Seleccione categoría para cargar atributos...</div>
-                                    </div>
-                                </div>
-
-                                <div class="col-12">
-                                    <div class="form-check form-switch">
-                                        <input class="form-check-input" type="checkbox" name="activo" id="activo" checked>
-                                        <label class="form-check-label" for="activo">Activo en catálogo</label>
-                                    </div>
-                                </div>
-
-                            </div>
-                        </div>
-
-                        <div class="modal-footer">
-                            <button type="submit" class="btn btn-success"><i class="fa fa-save"></i> Guardar ingreso</button>
->>>>>>> Stashed changes
                             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
                         </div>
                     </div>
                 </form>
             </div>
         </div>
+
+        <!-- Modal: Ver Detalles del Ingreso -->
+<div class="modal fade" id="modalDetallesIngreso" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header bg-info text-white">
+                <h5 class="modal-title" id="modalDetallesLabel">Detalles del Ingreso #<span id="detalle_id_ingreso"></span></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <!-- Información del Ingreso -->
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <h6>Información de Factura</h6>
+                        <table class="table table-sm table-bordered">
+                            <tr>
+                                <td class="fw-bold" style="width: 40%">N° Factura:</td>
+                                <td id="detalle_numero_factura" class="fw-bold text-primary"></td>
+                            </tr>
+                            <tr>
+                                <td class="fw-bold">Fecha Ingreso:</td>
+                                <td id="detalle_fecha_ingreso"></td>
+                            </tr>
+                            <tr>
+                                <td class="fw-bold">Fecha Emisión:</td>
+                                <td id="detalle_fecha_emision"></td>
+                            </tr>
+                            <tr>
+                                <td class="fw-bold">Método Pago:</td>
+                                <td id="detalle_metodo_pago"></td>
+                            </tr>
+                        </table>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>Información Financiera</h6>
+                        <table class="table table-sm table-bordered">
+                            <tr>
+                                <td class="fw-bold" style="width: 40%">Subtotal:</td>
+                                <td id="detalle_subtotal" class="text-end fw-bold"></td>
+                            </tr>
+                            <tr>
+                                <td class="fw-bold">IGV (18%):</td>
+                                <td id="detalle_igv" class="text-end"></td>
+                            </tr>
+                            <tr>
+                                <td class="fw-bold">Total:</td>
+                                <td id="detalle_total" class="text-end fw-bold text-success"></td>
+                            </tr>
+                            <tr>
+                                <td class="fw-bold">Registrado por:</td>
+                                <td id="detalle_usuario" class="text-primary"></td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Información adicional -->
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <h6>Detalles de Pago</h6>
+                        <table class="table table-sm table-bordered">
+                            <tr>
+                                <td class="fw-bold" style="width: 40%">Días Crédito:</td>
+                                <td id="detalle_dias_credito"></td>
+                            </tr>
+                            <tr>
+                                <td class="fw-bold">Fecha Pago:</td>
+                                <td id="detalle_fecha_pago"></td>
+                            </tr>
+                        </table>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>Información del Registro</h6>
+                        <table class="table table-sm table-bordered">
+                            <tr>
+                                <td class="fw-bold" style="width: 40%">Fecha Registro:</td>
+                                <td id="detalle_fecha_registro"></td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Observaciones -->
+                <div class="mb-4">
+                    <h6>Observaciones</h6>
+                    <div class="card bg-light">
+                        <div class="card-body">
+                            <p id="detalle_observaciones" class="mb-0"></p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Productos del Ingreso -->
+                <h6>Productos Ingresados</h6>
+                <div class="table-responsive">
+                    <table class="table table-bordered table-striped table-hover">
+                        <thead class="table-dark">
+                            <tr>
+                                <th width="50">#</th>
+                                <th>Producto</th>
+                                <th>Marca</th>
+                                <th>Proveedor</th>
+                                <th>Categoría</th>
+                                <th class="text-end">Precio Compra</th>
+                                <th class="text-end">Cantidad</th>
+                                <th class="text-end">Subtotal</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tablaDetallesProductos">
+                            <!-- Los productos se cargarán aquí -->
+                        </tbody>
+                        <tfoot class="table-light">
+                            <tr>
+                                <td colspan="7" class="text-end fw-bold">Total General:</td>
+                                <td id="detalle_total_general" class="text-end fw-bold text-success"></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="fa fa-times me-2"></i>Cerrar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
 
     </div> <!-- cierre contenido -->
 </div> <!-- cierre flex -->
@@ -783,7 +569,6 @@ body.oscuro .atributo-multiple { background: #2c3034; border-color: #495057; }
 
 <script>
 $(document).ready(function(){
-<<<<<<< Updated upstream
     $('#tablaIngresos').DataTable();
     let contadorFilas = 0;
     let filaSeleccionada = null;
@@ -1414,174 +1199,119 @@ $(document).ready(function(){
     });
 
     // ==========================
-    // BOTONES VER INGRESO
-    // ==========================
+// BOTONES VER INGRESO - MODAL DE DETALLES
+// ==========================
+
+$('.btn-ver-ingreso').on('click', function(){
+    const idIngreso = $(this).data('id');
+    const $btn = $(this);
+    const originalHtml = $btn.html();
     
-    $('.btn-ver-ingreso').on('click', function(){
-        const idIngreso = $(this).data('id');
-        
-        $.getJSON('obtener_detalle_ingreso.php', { 
-            id_ingreso: idIngreso 
-        }, function(response){
-            if(response.status === 'ok') {
-                // Aquí mostrarías el modal con los detalles
-                console.log('Detalles del ingreso:', response.data);
-                alert('Funcionalidad de ver detalles en desarrollo para ingreso ID: ' + idIngreso);
-            } else {
-                alert('Error al cargar detalles del ingreso');
-            }
-        }).fail(function(){
-            alert('Error de conexión');
-        });
+    // Mostrar loading
+    $btn.html('<span class="spinner-border spinner-border-sm" role="status"></span> Cargando...').prop('disabled', true);
+    
+    $.getJSON('obtener_detalle_ingreso.php', { 
+        id_ingreso: idIngreso 
+    }, function(response){
+        if(response.status === 'ok') {
+            mostrarModalDetalles(response.data);
+        } else {
+            alert('Error al cargar detalles del ingreso: ' + response.message);
+        }
+    }).fail(function(xhr, status, error){
+        alert('Error de conexión: ' + error);
+        console.error('Error:', xhr.responseText);
+    }).always(function(){
+        // Restaurar botón
+        $btn.html(originalHtml).prop('disabled', false);
     });
+});
+
+function mostrarModalDetalles(data) {
+    const ingreso = data.ingreso;
+    const detalles = data.detalle;
+    
+    // Llenar información del ingreso
+    $('#detalle_id_ingreso').text(ingreso.id_ingreso);
+    $('#detalle_numero_factura').text(ingreso.numero_factura);
+    $('#detalle_fecha_ingreso').text(formatearFecha(ingreso.fecha_ingreso));
+    $('#detalle_fecha_emision').text(formatearFecha(ingreso.fecha_emision));
+    $('#detalle_metodo_pago').html(ingreso.metodo_pago === 'contado' ? 
+        '<span class="badge bg-success">Contado</span>' : 
+        '<span class="badge bg-warning">Crédito - ' + (ingreso.dias_credito || 0) + ' días</span>');
+    $('#detalle_dias_credito').text(ingreso.dias_credito || '0');
+    $('#detalle_fecha_pago').text(ingreso.fecha_pago ? formatearFecha(ingreso.fecha_pago) : 'No aplica');
+    $('#detalle_subtotal').text('S/ ' + parseFloat(ingreso.subtotal || 0).toFixed(2));
+    $('#detalle_igv').text('S/ ' + parseFloat(ingreso.igv || 0).toFixed(2));
+    $('#detalle_total').text('S/ ' + parseFloat(ingreso.total || 0).toFixed(2));
+    $('#detalle_observaciones').text(ingreso.observaciones || 'Sin observaciones');
+    $('#detalle_usuario').text(ingreso.usuario_registro);
+    $('#detalle_fecha_registro').text(formatearFechaHora(ingreso.fecha_registro));
+    
+    // Llenar tabla de productos
+    const tbody = $('#tablaDetallesProductos');
+    tbody.empty();
+    
+    let totalGeneral = 0;
+    
+    detalles.forEach((detalle, index) => {
+        const subtotal = parseFloat(detalle.subtotal_detalle || (detalle.precio_compra * detalle.cantidad) || 0);
+        totalGeneral += subtotal;
+        
+        const fila = `
+            <tr>
+                <td class="text-center">${index + 1}</td>
+                <td>
+                    <strong>${detalle.nombre_producto}</strong>
+                </td>
+                <td>${detalle.marca || '<span class="text-muted">N/A</span>'}</td>
+                <td>${detalle.nombre_proveedor}</td>
+                <td>${detalle.nombre_categoria}</td>
+                <td class="text-end">S/ ${parseFloat(detalle.precio_compra || 0).toFixed(2)}</td>
+                <td class="text-end">${parseInt(detalle.cantidad || 0).toLocaleString()}</td>
+                <td class="text-end fw-bold">S/ ${subtotal.toFixed(2)}</td>
+            </tr>
+        `;
+        tbody.append(fila);
+    });
+    
+    // Actualizar total general
+    $('#detalle_total_general').text('S/ ' + totalGeneral.toFixed(2));
+    
+    // Mostrar modal
+    $('#modalDetallesIngreso').modal('show');
+}
+
+function formatearFecha(fecha) {
+    if (!fecha || fecha === '0000-00-00') return 'N/A';
+    try {
+        return new Date(fecha + 'T00:00:00').toLocaleDateString('es-ES', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric'
+        });
+    } catch (e) {
+        return fecha;
+    }
+}
+
+function formatearFechaHora(fechaHora) {
+    if (!fechaHora) return 'N/A';
+    try {
+        return new Date(fechaHora).toLocaleString('es-ES', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+    } catch (e) {
+        return fechaHora;
+    }
+}
 
     // Inicializar cálculos
     calcularTotales();
-=======
-    $('#tablaCatalogo').DataTable();
-
-    // Si se abre modal desde botón 'Ingresar' en fila, prellenar campos
-    $('.btn-abrir-ingreso').on('click', function(){
-        const id = $(this).data('id');
-        const nombre = $(this).data('nombre');
-        const precio = $(this).data('precio');
-        // ponemos catalogo_id (por si queremos usarlo)
-        $('#catalogo_id').val(id);
-        $('#nombre_producto').val(nombre);
-        $('#precio_compra').val(precio);
-        // Asegurar que el hidden proveedor tenga el valor actual (viene por GET)
-        const currentProveedor = <?= isset($_GET['proveedor_id']) ? (int)$_GET['proveedor_id'] : 0 ?>;
-        if (currentProveedor) {
-            $('#hidden_proveedor_id').val(currentProveedor);
-            $('#proveedor_id').val(currentProveedor);
-        }
-    });
-
-    // Cuando cambie la categoria en el modal, pedir atributos
-    $('#categoria_id').change(function(){
-        let categoriaId = $(this).val();
-        if(!categoriaId) {
-            $('#atributosContainer').html('<div class="text-muted small">Seleccione categoría para cargar atributos...</div>');
-            return;
-        }
-        $('#atributosContainer').html('<div class="text-muted small">Cargando atributos...</div>');
-        $.getJSON('catalogo_atributos.php', { categoria_id: categoriaId }, function(res){
-            if(!res || res.status !== 'ok') {
-                $('#atributosContainer').html('<div class="text-danger small">Error cargando atributos</div>');
-                return;
-            }
-            const attrs = res.data;
-            if(!attrs.length) {
-                $('#atributosContainer').html('<div class="text-muted small">No hay atributos para esta categoría.</div>');
-                return;
-            }
-            let html = '';
-            attrs.forEach(a=>{
-                const id = a.id_atributo;
-                const label = a.nombre_atributo;
-                const tipo = a.tipo_atributo;
-                const obligatorio = a.obligatorio == 1 ? 'required' : '';
-                
-                html += `
-                <div class="atributo-multiple" data-atributo-id="${id}" data-tipo="${tipo}">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <label class="form-label fw-bold">${label}</label>
-                        <button type="button" class="btn btn-sm btn-outline-primary btn-agregar-valor" data-atributo="${id}">
-                            <i class="fa fa-plus"></i> Agregar valor
-                        </button>
-                    </div>
-                    <div class="valores" id="valores-${id}">
-                        <div class="valor-item">
-                            <input type="${getInputType(tipo)}" 
-                                   name="atributos[${id}][]" 
-                                   class="form-control" 
-                                   ${obligatorio}
-                                   placeholder="Ingrese un valor"
-                                   step="${tipo === 'decimal' ? '0.01' : '1'}">
-                            <button type="button" class="btn btn-sm btn-outline-danger btn-eliminar-valor" style="display:none;">
-                                <i class="fa fa-times"></i>
-                            </button>
-                        </div>
-                    </div>
-                </div>`;
-            });
-            $('#atributosContainer').html(html);
-            // Inicializar eventos para botones de agregar/eliminar
-            initAtributosEvents();
-        }).fail(function(){
-            $('#atributosContainer').html('<div class="text-danger small">Error de red al pedir atributos</div>');
-        });
-    });
-
-    function getInputType(tipo) {
-        switch(tipo) {
-            case 'numero': return 'number';
-            case 'decimal': return 'number';
-            case 'fecha': return 'date';
-            case 'booleano': return 'checkbox';
-            default: return 'text';
-        }
-    }
-
-    function initAtributosEvents() {
-        // Agregar valor
-        $('.btn-agregar-valor').off('click').on('click', function(){
-            const atributoId = $(this).data('atributo');
-            const container = $(this).closest('.atributo-multiple');
-            const tipo = container.data('tipo');
-            const valoresContainer = $('#valores-' + atributoId);
-            
-            const newItem = `
-                <div class="valor-item">
-                    <input type="${getInputType(tipo)}" 
-                           name="atributos[${atributoId}][]" 
-                           class="form-control" 
-                           placeholder="Ingrese un valor"
-                           step="${tipo === 'decimal' ? '0.01' : '1'}">
-                    <button type="button" class="btn btn-sm btn-outline-danger btn-eliminar-valor">
-                        <i class="fa fa-times"></i>
-                    </button>
-                </div>`;
-            
-            valoresContainer.append(newItem);
-            // Mostrar botones de eliminar en todos los items
-            valoresContainer.find('.btn-eliminar-valor').show();
-        });
-
-        // Eliminar valor
-        $(document).on('click', '.btn-eliminar-valor', function(){
-            const item = $(this).closest('.valor-item');
-            const container = item.closest('.valores');
-            item.remove();
-            // Ocultar botón de eliminar si solo queda un item
-            if (container.find('.valor-item').length === 1) {
-                container.find('.btn-eliminar-valor').hide();
-            }
-        });
-    }
-
-    // Limpiar modal al cerrarlo
-    $('#modalAgregar').on('hidden.bs.modal', function () {
-        $('#formCrearCatalogo')[0].reset();
-        $('#atributosContainer').html('<div class="text-muted small">Seleccione categoría para cargar atributos...</div>');
-        $('#catalogo_id').val('');
-        // conservar hidden proveedor si existe (no modificar)
-        const currentProveedor = <?= isset($_GET['proveedor_id']) ? (int)$_GET['proveedor_id'] : 0 ?>;
-        if (currentProveedor) {
-            $('#hidden_proveedor_id').val(currentProveedor);
-            $('#proveedor_id').val(currentProveedor);
-        }
-    });
-
-    // Al abrir modal de cualquier forma, asegurar que el select visible muestre el proveedor actual
-    $('#modalAgregar').on('show.bs.modal', function () {
-        const currentProveedor = <?= isset($_GET['proveedor_id']) ? (int)$_GET['proveedor_id'] : 0 ?>;
-        if (currentProveedor) {
-            $('#hidden_proveedor_id').val(currentProveedor);
-            $('#proveedor_id').val(currentProveedor);
-        }
-    });
->>>>>>> Stashed changes
 });
 </script>
 </body>

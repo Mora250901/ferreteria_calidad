@@ -21,17 +21,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['pedido'])) {
             continue; // si llega algo inesperado, ignoramos
         }
 
-        // Actualizar tabla pedidos
+        // Solo actualizar tabla pedidos (elimina la parte de transacciones)
         $stmt = $conn->prepare("UPDATE pedidos SET estado = ? WHERE id_pedido = ?");
         $stmt->bind_param("si", $estado, $id_pedido);
         $stmt->execute();
         $stmt->close();
 
-        // Actualizar transacciones asociadas (si tienes la tabla transacciones)
-        $stmt = $conn->prepare("UPDATE transacciones SET estado = ? WHERE id_pedido = ?");
-        $stmt->bind_param("si", $estado, $id_pedido);
-        $stmt->execute();
-        $stmt->close();
+        // Si necesitas actualizar transacciones, primero necesitas saber el id_pago
+        // Pero según tu estructura, mejor elimina esta parte por ahora
     }
 }
 

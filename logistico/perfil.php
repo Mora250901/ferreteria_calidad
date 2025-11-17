@@ -110,7 +110,7 @@ body.oscuro .card {
     <h2 class="mb-4">Perfil de Usuario</h2>
     <div class="text-muted mb-4">Bienvenido, <strong><?= htmlspecialchars($u['usuario']) ?></strong></div>
 
-    <!-- Datos personales -->
+   <!-- Datos personales -->
     <div class="card mb-4 shadow-sm">
         <div class="card-header bg-primary text-white">Datos Personales</div>
         <div class="card-body">
@@ -118,25 +118,25 @@ body.oscuro .card {
                 <div id="alertaPerfil"></div>
                 <div class="mb-3">
                     <label class="form-label">Usuario</label>
-                    <input type="text" class="form-control" value="<?= htmlspecialchars($u['usuario']) ?>" disabled>
+                    <input type="text" class="form-control" value="<?= htmlspecialchars($u['usuario']) ?>" readonly>
                 </div>
                 <div class="mb-3">
-                    <label for="email" class="form-label">Correo Electrónico</label>
-                    <input type="email" id="email" name="email" class="form-control" value="<?= htmlspecialchars($u['email']) ?>" required>
+                    <label class="form-label">Correo Electrónico</label>
+                    <input type="email" class="form-control" value="<?= htmlspecialchars($u['email']) ?>" readonly>
                 </div>
                 <div class="mb-3">
-                    <label for="telefono" class="form-label">Teléfono</label>
-                    <input type="text" id="telefono" name="telefono" class="form-control" value="<?= htmlspecialchars($u['telefono'] ?? '') ?>" required>
+                    <label class="form-label">Teléfono</label>
+                    <input type="text" class="form-control" value="<?= htmlspecialchars($u['telefono'] ?? '') ?>" readonly>
                 </div>
                 <div class="mb-3">
-                    <label for="direccion" class="form-label">Dirección</label>
-                    <textarea id="direccion" name="direccion" class="form-control"><?= htmlspecialchars($u['direccion'] ?? '') ?></textarea>
+                    <label class="form-label">Dirección</label>
+                    <textarea class="form-control" readonly><?= htmlspecialchars($u['direccion'] ?? '') ?></textarea>
                 </div>
                 <div class="mb-3">
                     <label class="form-label">Documento</label>
-                    <input type="text" class="form-control" value="<?= htmlspecialchars($u['documento'] ?? 'No registrado') ?>" disabled>
+                    <input type="text" class="form-control" value="<?= htmlspecialchars($u['documento'] ?? 'No registrado') ?>" readonly>
                 </div>
-                <button type="submit" class="btn btn-success"><i class="fas fa-save me-2"></i>Actualizar Perfil</button>
+                <!-- Eliminé el botón de actualizar perfil -->
             </form>
         </div>
     </div>

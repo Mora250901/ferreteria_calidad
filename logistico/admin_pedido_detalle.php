@@ -3,8 +3,14 @@ session_start();
 require_once("../config/conexion.php");
 
 // Verificar rol admin
-if (!isset($_SESSION['autenticado']) || $_SESSION['usuario_data']['rol'] !== 'admin') {
-    header("Location: login.php");
+/* 1) Seguridad: solo admins */
+if (!isset($_SESSION['autenticado']) || !isset($_SESSION['usuario_data'])) {
+    header("Location: ../public/login.php");
+    exit;
+}
+$u = $_SESSION['usuario_data'];
+if (!isset($u['rol']) || $u['rol'] !== 'logistico') {
+    header("Location: ../public/login.php");
     exit;
 }
 
@@ -33,11 +39,10 @@ if (!$pedido) {
 }
 
 // Obtener detalles del pedido
-$sql = "SELECT d.*, pr.nombre AS producto_nombre, s.nombre AS servicio_nombre
-        FROM detalles_pedido d
-        LEFT JOIN productos pr ON d.id_producto = pr.id_producto
-        LEFT JOIN servicios s ON d.id_servicio = s.id_servicio
-        WHERE d.id_pedido = ?";
+$sql = "SELECT pd.*, pr.nombre_producto AS nombre_producto
+        FROM pedido_detalle pd
+        LEFT JOIN productos pr ON pd.id_producto = pr.id_producto
+        WHERE pd.id_pedido = ?";
 $stmt = $conn->prepare($sql);
 $stmt->bind_param("i", $id_pedido);
 $stmt->execute();
@@ -70,26 +75,26 @@ $stmt->close();
             <p><strong>Estado Pago:</strong> <span class="badge bg-warning"><?= htmlspecialchars($pedido['estado_pago']) ?></span></p>
             <p><strong>Total:</strong> <span class="text-danger fw-bold">S/ <?= number_format($pedido['total'], 2) ?></span></p>
             <p><strong>Dirección de envío:</strong> <?= htmlspecialchars($pedido['direccion_envio']) ?></p>
-            <p><strong>Fecha:</strong> <?= htmlspecialchars($pedido['fecha']) ?></p>
+            <p><strong>Fecha:</strong> <?= htmlspecialchars($pedido['fecha_pedido']) ?></p>
         </div>
     </div>
 
     <!-- Comprobante -->
-    <?php if ($pedido['comprobante_pago']): ?>
+    <?php if ($pedido['referencia_pago']): ?>
     <div class="card mb-4">
         <div class="card-header bg-secondary text-white">Comprobante</div>
         <div class="card-body text-center">
             <div class="d-flex justify-content-center gap-3">
                 <!-- Botón Inspeccionar -->
-                <a href="<?= htmlspecialchars($pedido['comprobante_pago']) ?>" class="btn btn-info" target="_blank">
+                <a href="<?= htmlspecialchars($pedido['referencia_pago']) ?>" class="btn btn-info" target="_blank">
                     <i class="bi bi-eye"></i> Inspeccionar
                 </a>
                 <!-- Botón Descargar -->
-                <a href="<?= htmlspecialchars($pedido['comprobante_pago']) ?>" class="btn btn-primary" download>
+                <a href="<?= htmlspecialchars($pedido['referencia_pago']) ?>" class="btn btn-primary" download>
                     <i class="bi bi-download"></i> Descargar
                 </a>
                 <!-- Botón Imprimir -->
-                <button type="button" class="btn btn-success" onclick="imprimirComprobante('<?= htmlspecialchars($pedido['comprobante_pago']) ?>')">
+                <button type="button" class="btn btn-success" onclick="imprimirComprobante('<?= htmlspecialchars($pedido['referencia_pago']) ?>')">
                     <i class="bi bi-printer"></i> Imprimir
                 </button>
             </div>
@@ -101,13 +106,13 @@ $stmt->close();
 
     <!-- Detalles del pedido -->
     <div class="card mb-4">
-        <div class="card-header bg-dark text-white">Productos / Servicios</div>
+        <div class="card-header bg-dark text-white">Productos</div>
         <div class="card-body">
             <?php if (!empty($detalles)): ?>
             <table class="table table-bordered">
                 <thead>
                     <tr>
-                        <th>Producto / Servicio</th>
+                        <th>Producto</th>
                         <th>Cantidad</th>
                         <th>Precio Unitario</th>
                         <th>Subtotal</th>
@@ -116,7 +121,7 @@ $stmt->close();
                 <tbody>
                 <?php foreach ($detalles as $d): ?>
                     <tr>
-                        <td><?= htmlspecialchars($d['producto_nombre'] ?: $d['servicio_nombre']) ?></td>
+                        <td><?= htmlspecialchars($d['nombre_producto'] ?: $d['servicio_nombre']) ?></td>
                         <td><?= intval($d['cantidad']) ?></td>
                         <td>S/ <?= number_format($d['precio_unitario'], 2) ?></td>
                         <td>S/ <?= number_format($d['subtotal'], 2) ?></td>
@@ -132,7 +137,7 @@ $stmt->close();
 
     <!-- Botones de acción -->
     <div class="text-end">
-        <a href="admin_dashboard.php" class="btn btn-secondary">Volver</a>
+        <a href="logistico_dashboard.php" class="btn btn-secondary">Volver</a>
     </div>
 </div>
 

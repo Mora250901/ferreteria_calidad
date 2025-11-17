@@ -282,7 +282,7 @@ body.oscuro .table-hover tbody tr:hover {
                                         <label class="form-check-label" for="aprobar_<?= (int)$p['id_pedido'] ?>">Aprobar</label>
                                     </div>
                                     <div class="form-check form-check-inline">
-                                        <input class="form-check-input" type="radio" name="pedido[<?= (int)$p['id_pedido'] ?>]" value="cancelado" id="rechazar_<?= (int)$p['id_pedido'] ?>">
+                                        <input class="form-check-input" type="radio" name="pedido[<?= (int)$p['id_pedido'] ?>]" value="rechazado" id="rechazar_<?= (int)$p['id_pedido'] ?>">
                                         <label class="form-check-label" for="rechazar_<?= (int)$p['id_pedido'] ?>">Rechazar</label>
                                     </div>
                                 </td>
@@ -328,7 +328,7 @@ body.oscuro .table-hover tbody tr:hover {
                             <td>S/ <?= number_format((float)$c['total'], 2) ?></td>
                             <td><?= htmlspecialchars($c['fecha_pedido']) ?></td>
                             <td>
-                                <a class="btn btn-sm btn-outline-secondary" href="admin_ver_comprobante.php?id=<?= (int)$c['id_pedido'] ?>">Ver</a>
+                                <a class="btn btn-sm btn-outline-secondary" href="logistico_ver_comprobante.php?id=<?= (int)$c['id_pedido'] ?>">Ver</a>
                             </td>
                             <td class="text-end">
                                 <a href="admin_pedido_detalle.php?id=<?= (int)$c['id_pedido'] ?>" class="btn btn-sm btn-outline-primary">Detalle</a>

@@ -2,20 +2,6 @@
 session_start();
 include("../config/conexion.php");
 
-<<<<<<< Updated upstream
-if (isset($_SESSION['autenticado'])) {
-    $rol = $_SESSION['usuario_data']['rol'];
-    $estado = $_SESSION['usuario_data']['estado'];
-
-    if ($estado !== 'activo') {
-        header("Location: login.php?error=" . $estado);
-        exit();
-    }
-
-    if ($rol == 'admin') {
-        header("Location: ../admin/admin_dashboard_general.php");
-    } elseif ($rol == 'logistico') {
-=======
 if (isset($_SESSION['autenticado']) && $_SESSION['autenticado'] === true) {
     $rol = $_SESSION['usuario_data']['rol'];
     $estado = $_SESSION['usuario_data']['estado'];
@@ -23,7 +9,6 @@ if (isset($_SESSION['autenticado']) && $_SESSION['autenticado'] === true) {
     if ($rol === 'admin') {
         header("Location: ../admin/admin_dashboard.php");
     } elseif ($rol === 'logistico' && $estado === 'activo') {
->>>>>>> Stashed changes
         header("Location: ../logistico/logistico_dashboard.php");
     } else {
         header("Location: index_home.php");

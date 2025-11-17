@@ -32,7 +32,7 @@ if (in_array($metodo, ["yape", "plin", "transferencia"])) {
         die("Formato de archivo no permitido.");
     }
 
-    $carpeta = "uploads/comprobantes/";
+    $carpeta = "../assets/img/uploads/comprobantes/";
     if (!is_dir($carpeta)) {
         mkdir($carpeta, 0777, true);
     }

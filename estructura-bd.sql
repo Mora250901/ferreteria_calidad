@@ -88,7 +88,6 @@ CREATE TABLE proveedor_categoria (
     FOREIGN KEY (id_categoria) REFERENCES categorias(id_categoria) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
-<<<<<<< Updated upstream
 CREATE TABLE catalogo_ingresos_pending (
     id_pending INT AUTO_INCREMENT PRIMARY KEY,
     id_catalogo INT NOT NULL,
@@ -100,8 +99,6 @@ CREATE TABLE catalogo_ingresos_pending (
     FOREIGN KEY (id_catalogo) REFERENCES catalogo_proveedor(id_catalogo) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
-=======
->>>>>>> Stashed changes
 -- =====================
 -- ATRIBUTOS DINÁMICOS
 -- =====================
@@ -335,13 +332,9 @@ CREATE TABLE compras (
     numero_factura VARCHAR(50) NOT NULL,
     fecha_compra DATE NOT NULL,
     total DECIMAL(10,2) DEFAULT 0,
-<<<<<<< Updated upstream
     metodo_pago ENUM('contado','credito') DEFAULT 'contado',
     fecha_pago DATE NULL,
     igv DECIMAL(5,2) DEFAULT 18.00;
-=======
-    creado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
->>>>>>> Stashed changes
     FOREIGN KEY (id_proveedor) REFERENCES proveedores(id_proveedor)
 );
 
@@ -368,7 +361,6 @@ CREATE TABLE ajustes_inventario (
     FOREIGN KEY (id_usuario) REFERENCES usuarios(id_usuario)
 );
 
-<<<<<<< Updated upstream
 -- 1. Nueva tabla para ingresos de inventario
 CREATE TABLE ingresos_inventario (
     id_ingreso INT AUTO_INCREMENT PRIMARY KEY,
@@ -417,8 +409,6 @@ CREATE TABLE ingreso_detalle_atributos (
     FOREIGN KEY (id_atributo) REFERENCES atributos(id_atributo) ON DELETE CASCADE
 );
 
-=======
->>>>>>> Stashed changes
 -- =====================
 -- ÍNDICES ÚTILES (ejemplos)
 -- =====================
@@ -479,7 +469,7 @@ DELIMITER ;
 
 DELIMITER $$
 
-CREATE TRIGGER trg_detalle_compras_insert
+CREATE TRIGGER trg_ajustes_inventario_insert
 AFTER INSERT ON detalle_compras
 FOR EACH ROW
 BEGIN

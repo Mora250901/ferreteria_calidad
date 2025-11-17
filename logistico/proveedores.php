@@ -486,7 +486,7 @@ const tabla = $('#tablaProveedores').DataTable({
         return `
           <div class="text-end">
             <button class="btn btn-sm btn-outline-primary me-1 btn-editar" data-id="${r.id_proveedor}"><i class="fa fa-pen"></i></button>
-            <button class="btn btn-sm btn-outline-danger btn-eliminar" data-id="${r.id_proveedor}"><i class="fa fa-trash"></i></button>
+            <!-- <button class="btn btn-sm btn-outline-danger btn-eliminar" data-id="${r.id_proveedor}"><i class="fa fa-trash"></i></button> -->
           </div>`;
     }}
   ]
