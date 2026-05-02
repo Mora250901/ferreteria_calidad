@@ -107,6 +107,7 @@ $total = 0;
         </div>
     <?php endif; ?>
 </div>
-
+<link rel="stylesheet" href="../assets/chatbot/chatbot.css">
+<script src="../assets/chatbot/chatbot.js"></script>
 </body>
 </html>

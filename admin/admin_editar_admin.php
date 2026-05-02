@@ -244,23 +244,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $admin_data) {
 <body>
 
 <div class="d-flex">
-    <div class="sidebar">
-        <h4 class="text-white text-center mb-4 mt-2">ADMIN PANEL 📊</h4>
-        <p class="text-secondary text-center small border-bottom border-secondary pb-3 mx-3">Bienvenido, <?php echo htmlspecialchars($_SESSION['usuario_data']['usuario'] ?? 'Admin'); ?></p>
-        
-        <ul class="list-unstyled components">
-            <li><a href="admin_dashboard_general.php"> ⚖ Dashboard General</a></li>
-            <li><a href="perfil_admin.php"> 🔑 Mi Perfil</a></li>
-            <hr class="text-white-50 my-2">
-            <li><a href="admin_gestionar_admin.php" class="active-link"> 👑 Gestión Administradores</a></li> 
-            <li><a href="admin_dashboard.php"> 💼 Gestión Logístico</a></li>
-            <li><a href="admin_registrar_logistico.php">📥 Agregar Nuevo Logístico</a></li>
-            <hr class="text-white-50 my-2">
-            <li><a href="admin_proveedores.php">👨🏽‍🤝‍👨🏻 Proveedores</a></li>
-            <li><a href="admin_reporte_ventas.php">📈 Reportes de Ventas</a></li>
-            <li class="mt-5"><a href="../public/logout.php" class="btn btn-danger btn-sm w-75 mx-auto d-block"><i class="fas fa-sign-out-alt me-2"></i> Cerrar Sesión</a></li>
-        </ul>
-    </div>
+    <?php include("../includes/sidebar_admin.php"); ?>
     
     <div class="main-content flex-grow-1">
         <h1 class="display-6 fw-bold text-dark mb-4">Editar Cuenta de Administrador</h1>

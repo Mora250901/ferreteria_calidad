@@ -455,37 +455,69 @@ if ($categoria > 0) {
 <?php include __DIR__ . '/../includes/navgar.php'; ?>
 
 <!-- Hero Banner con Buscador -->
-<section class="hero-banner">
-    <div class="container">
-        <div class="hero-content">
-            <h1 class="hero-title">Encuentra Todo lo que Necesitas</h1>
-            <p class="hero-subtitle">Miles de productos para tu hogar, obra o negocio</p>
+<?php
+$banners = [];
+$res_banners = $conn->query("SELECT * FROM banners WHERE activo = 1 ORDER BY orden ASC");
+if ($res_banners) while ($b = $res_banners->fetch_assoc()) $banners[] = $b;
+?>
 
-            <!-- Buscador -->
-            <div class="search-container">
-                <form method="get" action="index_home.php">
-                    <div class="search-box">
-                        <i class="bi bi-search ms-3 text-muted"></i>
-                        <input type="text" 
-                               name="q" 
-                               value="<?= htmlspecialchars($q) ?>"
-                               placeholder="Buscar productos, marcas o categorías...">
-                        <select name="categoria" class="form-select-sm">
-                            <option value="0">Todas las categorías</option>
-                            <?php foreach ($cats as $c): ?>
-                                <option value="<?= (int)$c['id_categoria'] ?>" 
-                                        <?= $categoria === (int)$c['id_categoria'] ? 'selected' : '' ?>>
-                                    <?= htmlspecialchars($c['nombre_categoria']) ?>
-                                </option>
-                            <?php endforeach; ?>
-                        </select>
-                        <button class="btn btn-danger" type="submit">
-                            <i class="bi bi-search me-1"></i> Buscar
-                        </button>
+<section class="hero-banner p-0 position-relative">
+    <div id="heroBannerCarousel" class="carousel slide" data-bs-ride="carousel">
+        <div class="carousel-inner">
+            <?php foreach ($banners as $i => $b): ?>
+            <div class="carousel-item <?= $i === 0 ? 'active' : '' ?>"
+                 style="<?= !empty($b['imagen']) ? 'background-image: url(../assets/img/banners/' . htmlspecialchars($b['imagen']) . '); background-size: cover; background-position: center;' : '' ?>">
+                <div class="hero-content" style="<?= !empty($b['imagen']) ? 'background: rgba(0,0,0,0.45);' : '' ?>">
+                    <div class="container py-5">
+                        <h1 class="hero-title"><?= htmlspecialchars($b['titulo']) ?></h1>
+                        <?php if (!empty($b['subtitulo'])): ?>
+                            <p class="hero-subtitle"><?= htmlspecialchars($b['subtitulo']) ?></p>
+                        <?php endif; ?>
+
+                        <!-- Buscador -->
+                        <div class="search-container">
+                            <form method="get" action="index_home.php">
+                                <div class="search-box">
+                                    <i class="bi bi-search ms-3 text-muted"></i>
+                                    <input type="text" name="q"
+                                           value="<?= htmlspecialchars($q) ?>"
+                                           placeholder="Buscar productos, marcas o categorías...">
+                                    <select name="categoria" class="form-select-sm">
+                                        <option value="0">Todas las categorías</option>
+                                        <?php foreach ($cats as $c): ?>
+                                            <option value="<?= (int)$c['id_categoria'] ?>"
+                                                    <?= $categoria === (int)$c['id_categoria'] ? 'selected' : '' ?>>
+                                                <?= htmlspecialchars($c['nombre_categoria']) ?>
+                                            </option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                    <button class="btn btn-danger" type="submit">
+                                        <i class="bi bi-search me-1"></i> Buscar
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
                     </div>
-                </form>
+                </div>
             </div>
+            <?php endforeach; ?>
         </div>
+
+        <?php if (count($banners) > 1): ?>
+        <button class="carousel-control-prev" type="button" data-bs-target="#heroBannerCarousel" data-bs-slide="prev">
+            <span class="carousel-control-prev-icon"></span>
+        </button>
+        <button class="carousel-control-next" type="button" data-bs-target="#heroBannerCarousel" data-bs-slide="next">
+            <span class="carousel-control-next-icon"></span>
+        </button>
+        <div class="carousel-indicators">
+            <?php foreach ($banners as $i => $b): ?>
+                <button type="button" data-bs-target="#heroBannerCarousel"
+                        data-bs-slide-to="<?= $i ?>"
+                        <?= $i === 0 ? 'class="active"' : '' ?>></button>
+            <?php endforeach; ?>
+        </div>
+        <?php endif; ?>
     </div>
 </section>
 

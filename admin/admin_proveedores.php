@@ -254,34 +254,18 @@ $conn->close();
 <body>
 
 <div class="d-flex">
-    <div class="sidebar">
-        <h4 class="text-white text-center mb-4 mt-2">ADMIN PANEL 📊</h4>
-        <p class="text-secondary text-center small border-bottom border-secondary pb-3 mx-3">Bienvenido, <?php echo htmlspecialchars($_SESSION['usuario_data']['usuario'] ?? 'Admin'); ?></p>
-        
-        <ul class="list-unstyled components">
-            <li><a href="admin_dashboard_general.php"> ⚖ Dashboard General</a></li>
-            <li><a href="perfil_admin.php"> 🔑 Mi Perfil</a></li>
-            <hr class="text-white-50 my-2">
-            <li><a href="admin_gestionar_admin.php"> 👑 Gestión Administradores</a></li> 
-            <li><a href="admin_dashboard.php"> 💼 Gestión Logístico</a></li>
-            <li><a href="admin_registrar_logistico.php">📥 Agregar Nuevo Logístico</a></li>
-            <hr class="text-white-50 my-2">
-            <li><a href="admin_proveedores.php" class="active-link">👨🏽‍🤝‍👨🏻 Proveedores</a></li>
-            <li><a href="admin_reporte_ventas.php">📈 Reportes de Ventas</a></li>
-            <li class="mt-5"><a href="../public/logout.php" class="btn btn-danger btn-sm w-75 mx-auto d-block"><i class="fas fa-sign-out-alt me-2"></i> Cerrar Sesión</a></li>
-        </ul>
-    </div>
+    <?php include("../includes/sidebar_admin.php"); ?>
     
     <div class="main-content flex-grow-1">
         <h1 class="display-6 fw-bold text-dark mb-4">Gestión de Proveedores</h1>
         
         <?php if (!empty($error_msg)): ?>
-            <div class="alert alert-danger security-alert shadow-sm"><i class="fas fa-exclamation-triangle me-2"></i> **ERROR:** <?php echo htmlspecialchars($error_msg); ?></div>
+            <div class="alert alert-danger security-alert shadow-sm"><i class="fas fa-exclamation-triangle me-2"></i> ERROR: <?php echo htmlspecialchars($error_msg); ?></div>
         <?php endif; ?>
 
         <?php if ($vista_detalle && isset($proveedor_data)): ?>
             
-            <h2 class="h3 mb-4 text-primary">Detalle del Proveedor: **<?php echo htmlspecialchars($proveedor_data['nombre_proveedor']); ?>**</h2>
+            <h2 class="h3 mb-4 text-primary">Detalle del Proveedor: <?php echo htmlspecialchars($proveedor_data['nombre_proveedor']); ?></h2>
             
             <div class="d-flex justify-content-between mb-4">
                 <a href="admin_proveedores.php" class="btn btn-secondary"><i class="fas fa-arrow-left me-2"></i> Volver al Listado</a>
@@ -368,11 +352,7 @@ $conn->close();
 
         <?php else: ?>
             
-            <div class="d-flex justify-content-end mb-4">
-                <a href="admin_registrar_proveedor.php" class="btn btn-register-blue shadow-sm">
-                    <i class="fas fa-plus-circle me-2"></i> **Registrar Nuevo Proveedor**
-                </a>
-            </div>
+
 
             <div class="card data-card">
                 <div class="card-header"><i class="fas fa-warehouse me-2"></i> Listado de Proveedores Registrados</div>
@@ -400,7 +380,7 @@ $conn->close();
                                     <?php foreach ($proveedores as $p): ?>
                                         <tr>
                                             <td><?php echo htmlspecialchars($p['id_proveedor']); ?></td>
-                                            <td>**<?php echo htmlspecialchars($p['nombre_proveedor']); ?>**</td>
+                                            <td><?php echo htmlspecialchars($p['nombre_proveedor']); ?></td>
                                             <td><?php echo htmlspecialchars($p['ruc'] ?? 'N/A'); ?></td>
                                             <td><?php echo htmlspecialchars($p['telefono']); ?></td>
                                             <td><?php echo htmlspecialchars($p['email']); ?></td>

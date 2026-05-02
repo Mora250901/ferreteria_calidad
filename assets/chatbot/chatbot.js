@@ -105,19 +105,17 @@ class ChatbotUI {
         this.setLoading(true);
         
         try {
+            // La ruta es relativa a la página que carga este JS.
+            // Como chatbot.js se incluye desde /public/, /admin/ y /logistico/,
+            // todas apuntan igual: ../includes/chatbot_handler.php
             const response = await fetch('../includes/chatbot_handler.php', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    message: message,
-                    sessionId: this.sessionId
-                })
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message: message })
             });
-            
+
             const data = await response.json();
-            
+
             if (data.success) {
                 this.addMessage(data.reply, 'bot');
             } else {

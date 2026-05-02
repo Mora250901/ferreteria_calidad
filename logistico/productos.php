@@ -202,17 +202,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         $id_proveedor = $productoCatalogo['id_proveedor'];
         
         $rutaDB = null;
+        // La carpeta por producto se crea después del INSERT para tener el id_producto
+        // imagen principal se guarda temporalmente y se mueve después
+        $tmpImagen = null;
         if (!empty($_FILES['imagen_principal']['name'])) {
-            $nombreArchivo = uniqid() . "." . pathinfo($_FILES["imagen_principal"]["name"], PATHINFO_EXTENSION);
-            $categoriaDir = "assets/img/productos";
-            $targetDir = dirname(__DIR__). "/$categoriaDir";
-            
-            if (!is_dir($targetDir)) mkdir($targetDir, 0777, true);
-            
-            $rutaDestino = $targetDir . "/" . $nombreArchivo;
-            if (move_uploaded_file($_FILES["imagen_principal"]["tmp_name"], $rutaDestino)) {
-                $rutaDB = "$categoriaDir/$nombreArchivo";
-            }
+            $tmpImagen = $_FILES['imagen_principal'];
         }
          
         $conn->begin_transaction();
@@ -224,6 +218,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $st->execute();
             $id_producto = $conn->insert_id;
             
+            // Crear carpeta por producto
+            $productoDir = "assets/img/productos/$id_producto";
+            $targetDir   = dirname(__DIR__) . "/$productoDir";
+            if (!is_dir($targetDir)) mkdir($targetDir, 0777, true);
+
+            // Guardar imagen principal
+            if ($tmpImagen && !empty($tmpImagen['name'])) {
+                $ext         = pathinfo($tmpImagen['name'], PATHINFO_EXTENSION);
+                $nombreArchivo = 'principal_' . time() . '.' . $ext;
+                $rutaDestino = $targetDir . '/' . $nombreArchivo;
+                if (move_uploaded_file($tmpImagen['tmp_name'], $rutaDestino)) {
+                    $rutaDB = "$productoDir/$nombreArchivo";
+                    $conn->query("UPDATE productos SET imagen_principal='$rutaDB' WHERE id_producto=$id_producto");
+                }
+            }
+
+            // Guardar imágenes adicionales
+            if (!empty($_FILES['imagenes_adicionales']['name'][0])) {
+                $stImg = $conn->prepare("INSERT INTO producto_imagenes (id_producto, ruta, es_principal, orden) VALUES (?, ?, 0, ?)");
+                foreach ($_FILES['imagenes_adicionales']['tmp_name'] as $i => $tmp) {
+                    if (empty($_FILES['imagenes_adicionales']['name'][$i])) continue;
+                    $ext  = pathinfo($_FILES['imagenes_adicionales']['name'][$i], PATHINFO_EXTENSION);
+                    $nombre = 'foto_' . time() . '_' . $i . '.' . $ext;
+                    $ruta = "$productoDir/$nombre";
+                    if (move_uploaded_file($tmp, $targetDir . '/' . $nombre)) {
+                        $stImg->bind_param('isi', $id_producto, $ruta, $i);
+                        $stImg->execute();
+                    }
+                }
+                $stImg->close();
+            }
+
             $sqlProv = "INSERT INTO producto_proveedor (id_producto, id_proveedor, precio_compra) 
                        VALUES (?, ?, ?)";
             $stProv = $conn->prepare($sqlProv);
@@ -406,24 +432,43 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             }
             $rutaDB = null;
         }
-                if (!empty($_FILES['imagen_principal']['name'])) {
-            if ($rutaActual && file_exists(dirname(__DIR__) . "/" . $rutaActual)) {
-                unlink(dirname(__DIR__) . "/" . $rutaActual);
-            }
 
-            $nombreArchivo = uniqid() . "." . pathinfo($_FILES["imagen_principal"]["name"], PATHINFO_EXTENSION);
-            $categoriaDir  = "assets/img/productos";
-            $targetDir     = dirname(__DIR__) . "/$categoriaDir";
+        if (!empty($_FILES['imagen_principal']['name'])) {
+          if ($rutaActual && file_exists(dirname(__DIR__) . "/" . $rutaActual)) {
+              unlink(dirname(__DIR__) . "/" . $rutaActual);
+          }
 
-            if (!is_dir($targetDir)) {
-                mkdir($targetDir, 0777, true);
-            }
+          $productoDir = "assets/img/productos/$id_producto";
+          $targetDir   = dirname(__DIR__) . "/$productoDir";
+          if (!is_dir($targetDir)) mkdir($targetDir, 0777, true);
 
-            $rutaDestino = $targetDir . "/" . $nombreArchivo;
-            if (move_uploaded_file($_FILES["imagen_principal"]["tmp_name"], $rutaDestino)) {
-                $rutaDB = "$categoriaDir/$nombreArchivo";
-            }
-        }
+          $ext           = pathinfo($_FILES["imagen_principal"]["name"], PATHINFO_EXTENSION);
+          $nombreArchivo = 'principal_' . time() . '.' . $ext;
+          $rutaDestino   = $targetDir . '/' . $nombreArchivo;
+          if (move_uploaded_file($_FILES["imagen_principal"]["tmp_name"], $rutaDestino)) {
+              $rutaDB = "$productoDir/$nombreArchivo";
+          }
+      }
+
+      // Guardar imágenes adicionales
+      if (!empty($_FILES['imagenes_adicionales']['name'][0])) {
+          $productoDir = "assets/img/productos/$id_producto";
+          $targetDir   = dirname(__DIR__) . "/$productoDir";
+          if (!is_dir($targetDir)) mkdir($targetDir, 0777, true);
+
+          $stImg = $conn->prepare("INSERT INTO producto_imagenes (id_producto, ruta, es_principal, orden) VALUES (?, ?, 0, ?)");
+          foreach ($_FILES['imagenes_adicionales']['tmp_name'] as $i => $tmp) {
+              if (empty($_FILES['imagenes_adicionales']['name'][$i])) continue;
+              $ext    = pathinfo($_FILES['imagenes_adicionales']['name'][$i], PATHINFO_EXTENSION);
+              $nombre = 'foto_' . time() . '_' . $i . '.' . $ext;
+              $ruta   = "$productoDir/$nombre";
+              if (move_uploaded_file($tmp, $targetDir . '/' . $nombre)) {
+                  $stImg->bind_param('isi', $id_producto, $ruta, $i);
+                  $stImg->execute();
+              }
+          }
+          $stImg->close();
+      }
 
         $sql = "UPDATE productos 
                 SET nombre_producto=?, descripcion=?, precio=?, sku=?, id_categoria=?, activo=?, imagen_principal=?
@@ -447,6 +492,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         echo json_encode(['status'=>$ok?'ok':'error','message'=>$ok?'Producto eliminado':'No se pudo eliminar']);
         exit;
     }
+
+    if ($_POST['action'] === 'eliminar_imagen_adicional' && isset($_POST['id_imagen'])) {
+      $id_imagen = (int)$_POST['id_imagen'];
+      $res = $conn->query("SELECT ruta FROM producto_imagenes WHERE id_imagen = $id_imagen");
+      if ($row = $res->fetch_assoc()) {
+          $ruta = dirname(__DIR__) . '/' . $row['ruta'];
+          if (file_exists($ruta)) unlink($ruta);
+          $conn->query("DELETE FROM producto_imagenes WHERE id_imagen = $id_imagen");
+          echo json_encode(['status' => 'ok']);
+      } else {
+          echo json_encode(['status' => 'error', 'message' => 'Imagen no encontrada']);
+      }
+      exit;
+  }
 
     echo json_encode(['status'=>'error','message'=>'Acción inválida']);
     exit;
@@ -655,8 +714,12 @@ body.oscuro .paso-header { background: #343a40; }
                 <input type="text" name="sku" class="form-control" placeholder="Código único del producto">
               </div>
               <div class="col-md-6">
-                <label class="form-label">Imagen del producto</label>
-                <input type="file" name="imagen_principal" class="form-control" accept="image/*">
+                  <label class="form-label">Imagen principal</label>
+                  <input type="file" name="imagen_principal" class="form-control" accept="image/*">
+              </div>
+              <div class="col-12">
+                  <label class="form-label">Fotos adicionales <small class="text-muted">(puedes seleccionar varias)</small></label>
+                  <input type="file" name="imagenes_adicionales[]" class="form-control" accept="image/*" multiple>
               </div>
               <div class="col-12">
                 <div class="form-check form-switch">
@@ -695,14 +758,20 @@ body.oscuro .paso-header { background: #343a40; }
               <input type="text" name="nombre" id="edit_nombre" class="form-control" required>
             </div>
             <div class="col-md-6">
-              <label class="form-label">Imagen actual</label>
-              <div id="previewImagen" class="mb-2"></div>
-              <label class="form-label">Cambiar imagen</label>
-              <input type="file" name="imagen_principal" class="form-control" accept="image/*">
-              <div class="form-check mt-2">
-                <input class="form-check-input" type="checkbox" name="eliminar_imagen" value="1" id="edit_eliminar_imagen">
-                <label class="form-check-label" for="edit_eliminar_imagen">Eliminar imagen actual</label>
-              </div>
+                <label class="form-label">Imagen principal actual</label>
+                <div id="previewImagen" class="mb-2"></div>
+                <label class="form-label">Cambiar imagen principal</label>
+                <input type="file" name="imagen_principal" class="form-control" accept="image/*">
+                <div class="form-check mt-2">
+                    <input class="form-check-input" type="checkbox" name="eliminar_imagen" value="1" id="edit_eliminar_imagen">
+                    <label class="form-check-label" for="edit_eliminar_imagen">Eliminar imagen principal</label>
+                </div>
+            </div>
+            <div class="col-12 mt-3">
+                <label class="form-label">Fotos adicionales actuales</label>
+                <div id="galeriaImagenes" class="d-flex flex-wrap gap-2 mb-2"></div>
+                <label class="form-label">Agregar más fotos</label>
+                <input type="file" name="imagenes_adicionales[]" class="form-control" accept="image/*" multiple>
             </div>
             <div class="col-md-4">
               <label class="form-label">Precio venta *</label>
@@ -865,9 +934,6 @@ const tabla = $('#tablaProductos').DataTable({
             </button>
             <button class="btn btn-sm btn-outline-primary me-1 btn-editar" data-id="${r.id_producto}" title="Editar">
               <i class="fa fa-pen"></i>
-            </button>
-            <button class="btn btn-sm btn-outline-danger btn-eliminar" data-id="${r.id_producto}" title="Eliminar">
-              <i class="fa fa-trash"></i>
             </button>
           </div>`;
     }}
@@ -1160,6 +1226,32 @@ $(document).on('click', '.btn-editar', function() {
           $('#previewImagen').html('<span class="text-muted">Sin imagen</span>');
         }
 
+        // Cargar fotos adicionales
+        const fd2 = new FormData();
+        fd2.append('action', 'get_imagenes_adicionales');
+        fd2.append('id', p.id_producto);
+
+        fetch('productos.php', { method: 'POST', body: fd2 })
+            .then(r => r.json())
+            .then(j => {
+                const galeria = document.getElementById('galeriaImagenes');
+                galeria.innerHTML = '';
+                if (j.status === 'ok' && j.imagenes.length > 0) {
+                    j.imagenes.forEach(img => {
+                        galeria.innerHTML += `
+                            <div class="position-relative" id="imgDiv_${img.id_imagen}">
+                                <img src="../${img.ruta}" style="height:70px;width:70px;object-fit:cover;border-radius:6px;">
+                                <button type="button"
+                                    class="btn btn-danger btn-sm position-absolute top-0 end-0 p-0 px-1 btn-eliminar-foto"
+                                    data-id="${img.id_imagen}"
+                                    style="font-size:10px;line-height:1.2;">✕</button>
+                            </div>`;
+                    });
+                } else {
+                    galeria.innerHTML = '<span class="text-muted small">Sin fotos adicionales</span>';
+                }
+            });
+
         // Proveedores
         let provs = '';
         (j.data.proveedores || []).forEach(pr => {
@@ -1235,6 +1327,24 @@ $('#modalCrear').on('hidden.bs.modal', function () {
   // reset stock display/hidden
   if (document.getElementById('display_stock')) document.getElementById('display_stock').value = '0';
   if (document.getElementById('form_stock')) document.getElementById('form_stock').value = '0';
+});
+
+$(document).on('click', '.btn-eliminar-foto', function() {
+    if (!confirm('¿Eliminar esta foto?')) return;
+    const id = $(this).data('id');
+    const fd = new FormData();
+    fd.append('action', 'eliminar_imagen_adicional');
+    fd.append('id_imagen', id);
+
+    fetch('productos.php', { method: 'POST', body: fd })
+        .then(r => r.json())
+        .then(j => {
+            if (j.status === 'ok') {
+                document.getElementById('imgDiv_' + id).remove();
+            } else {
+                alert('Error al eliminar la foto');
+            }
+        });
 });
 </script>
 </body>

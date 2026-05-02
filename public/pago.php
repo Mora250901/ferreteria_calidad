@@ -114,5 +114,7 @@ $metodo    = $_POST['metodo_pago'];
 
 <!-- Bootstrap JS -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<link rel="stylesheet" href="../assets/chatbot/chatbot.css">
+<script src="../assets/chatbot/chatbot.js"></script>
 </body>
 </html>

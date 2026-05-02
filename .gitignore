@@ -17,3 +17,7 @@ Thumbs.db
 session_*
 cache/
 tmp/
+
+# Variables de entorno con API keys
+.env
+config/groq.php

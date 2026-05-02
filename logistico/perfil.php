@@ -13,8 +13,6 @@ if (!isset($u['rol']) || $u['rol'] !== 'logistico') {
     header("Location: ../public/login.php");
     exit;
 }
-
-$u = $_SESSION['usuario_data'];
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -110,60 +108,68 @@ body.oscuro .card {
     <h2 class="mb-4">Perfil de Usuario</h2>
     <div class="text-muted mb-4">Bienvenido, <strong><?= htmlspecialchars($u['usuario']) ?></strong></div>
 
-   <!-- Datos personales -->
+    <!-- Datos personales (SOLO LECTURA) -->
     <div class="card mb-4 shadow-sm">
         <div class="card-header bg-primary text-white">Datos Personales</div>
         <div class="card-body">
-            <form id="formPerfil">
-                <div id="alertaPerfil"></div>
-                <div class="mb-3">
-                    <label class="form-label">Usuario</label>
-                    <input type="text" class="form-control" value="<?= htmlspecialchars($u['usuario']) ?>" readonly>
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <label class="form-label fw-bold">Usuario</label>
+                    <div class="form-control bg-light"><?= htmlspecialchars($u['usuario']) ?></div>
                 </div>
-                <div class="mb-3">
-                    <label class="form-label">Correo Electrónico</label>
-                    <input type="email" class="form-control" value="<?= htmlspecialchars($u['email']) ?>" readonly>
+                <div class="col-md-6 mb-3">
+                    <label class="form-label fw-bold">Rol</label>
+                    <div class="form-control bg-light"><?= htmlspecialchars($u['rol']) ?></div>
                 </div>
-                <div class="mb-3">
-                    <label class="form-label">Teléfono</label>
-                    <input type="text" class="form-control" value="<?= htmlspecialchars($u['telefono'] ?? '') ?>" readonly>
+                <div class="col-md-6 mb-3">
+                    <label class="form-label fw-bold">Correo Electrónico</label>
+                    <div class="form-control bg-light"><?= htmlspecialchars($u['email']) ?></div>
                 </div>
-                <div class="mb-3">
-                    <label class="form-label">Dirección</label>
-                    <textarea class="form-control" readonly><?= htmlspecialchars($u['direccion'] ?? '') ?></textarea>
+                <div class="col-md-6 mb-3">
+                    <label class="form-label fw-bold">Teléfono</label>
+                    <div class="form-control bg-light"><?= htmlspecialchars($u['telefono'] ?? 'No registrado') ?></div>
                 </div>
-                <div class="mb-3">
-                    <label class="form-label">Documento</label>
-                    <input type="text" class="form-control" value="<?= htmlspecialchars($u['documento'] ?? 'No registrado') ?>" readonly>
+                <div class="col-12 mb-3">
+                    <label class="form-label fw-bold">Dirección</label>
+                    <div class="form-control bg-light" style="min-height: 80px;"><?= htmlspecialchars($u['direccion'] ?? 'No registrada') ?></div>
                 </div>
-                <!-- Eliminé el botón de actualizar perfil -->
-            </form>
+                <div class="col-md-6 mb-3">
+                    <label class="form-label fw-bold">Documento</label>
+                    <div class="form-control bg-light"><?= htmlspecialchars($u['documento'] ?? 'No registrado') ?></div>
+                </div>
+            </div>
         </div>
     </div>
 
-    <!-- Cambiar contraseña -->
+    <!-- Cambiar contraseña (ÚNICA EDICIÓN PERMITIDA) -->
     <div class="card shadow-sm">
         <div class="card-header bg-warning">Cambiar Contraseña</div>
         <div class="card-body">
             <div id="alertaPassword"></div>
             <form id="formPassword">
-                <div class="mb-3">
-                    <label for="actual" class="form-label">Contraseña Actual</label>
-                    <input type="password" id="actual" name="actual" class="form-control" required>
+                <div class="row">
+                    <div class="col-md-4 mb-3">
+                        <label for="actual" class="form-label">Contraseña Actual</label>
+                        <input type="password" id="actual" name="actual" class="form-control" required>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label for="nueva" class="form-label">Nueva Contraseña</label>
+                        <input type="password" id="nueva" name="nueva" class="form-control" required>
+                        <small class="form-text text-muted">Mínimo 8 caracteres, 1 mayúscula, 1 número y 1 carácter especial</small>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label for="confirmar" class="form-label">Confirmar Nueva Contraseña</label>
+                        <input type="password" id="confirmar" name="confirmar" class="form-control" required>
+                    </div>
                 </div>
-                <div class="mb-3">
-                    <label for="nueva" class="form-label">Nueva Contraseña</label>
-                    <input type="password" id="nueva" name="nueva" class="form-control" required>
-                </div>
-                <div class="mb-3">
-                    <label for="confirmar" class="form-label">Confirmar Nueva Contraseña</label>
-                    <input type="password" id="confirmar" name="confirmar" class="form-control" required>
-                </div>
+                
                 <div class="form-check mb-3">
                     <input type="checkbox" class="form-check-input" id="confirmarCambio">
                     <label class="form-check-label" for="confirmarCambio">Confirmo que deseo cambiar mi contraseña</label>
                 </div>
-                <button type="submit" id="btnGuardar" class="btn btn-primary" disabled><i class="fas fa-key me-2"></i>Actualizar Contraseña</button>
+                <button type="submit" id="btnGuardar" class="btn btn-primary" disabled>
+                    <i class="fas fa-key me-2"></i>Actualizar Contraseña
+                </button>
             </form>
         </div>
     </div>
@@ -177,52 +183,27 @@ document.getElementById('confirmarCambio').addEventListener('change', function()
     document.getElementById('btnGuardar').disabled = !this.checked;
 });
 
-// Validar email y teléfono antes de enviar
-document.getElementById('formPerfil').addEventListener('submit', function(e) {
-    e.preventDefault();
-    const email = document.getElementById('email').value.trim();
-    const telefono = document.getElementById('telefono').value.trim();
-
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/; // expresión regular para correo
-    if (!emailRegex.test(email)) {
-        mostrarAlerta('alertaPerfil', 'danger', 'El correo debe ser válido');
-        return;
-    }
-
-    const telefonoRegex = /^[0-9]{9}$/;
-    if (!telefonoRegex.test(telefono)) {
-        mostrarAlerta('alertaPerfil', 'danger', 'El teléfono debe contener exactamente 9 dígitos');
-        return;
-    }
-
-    fetch('../config/perfil_update.php', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({
-            email: email,
-            telefono: telefono,
-            direccion: document.getElementById('direccion').value.trim()
-        })
-    })
-    .then(res => res.json())
-    .then(data => {
-        mostrarAlerta('alertaPerfil', data.status === 'ok' ? 'success' : 'danger', data.message);
-    });
-});
-
 // Cambio de contraseña con AJAX
 document.getElementById('formPassword').addEventListener('submit', function(e) {
     e.preventDefault();
     const actual = document.getElementById('actual').value.trim();
     const nueva = document.getElementById('nueva').value.trim();
     const confirmar = document.getElementById('confirmar').value.trim();
-    const confirmarCambio = document.getElementById('confirmarCambio').checked;
 
+    // Validaciones
     if (nueva !== confirmar) {
         mostrarAlerta('alertaPassword', 'danger', 'Las contraseñas no coinciden.');
         return;
     }
 
+    // Validar fortaleza de contraseña
+    const passwordRegex = /^(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+    if (!passwordRegex.test(nueva)) {
+        mostrarAlerta('alertaPassword', 'danger', 'La nueva contraseña debe tener mínimo 8 caracteres, una mayúscula, un número y un carácter especial.');
+        return;
+    }
+
+    // Enviar datos al servidor
     fetch('../config/perfil_ajax.php', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -230,7 +211,7 @@ document.getElementById('formPassword').addEventListener('submit', function(e) {
             actual: actual,
             nueva: nueva,
             confirmar: confirmar,
-            confirmar_checkbox: confirmarCambio ? 'true' : 'false'
+            action: 'cambiar_password'
         })
     })
     .then(res => res.json())
@@ -239,18 +220,46 @@ document.getElementById('formPassword').addEventListener('submit', function(e) {
         if (data.status === 'success') {
             document.getElementById('formPassword').reset();
             document.getElementById('btnGuardar').disabled = true;
+            document.getElementById('confirmarCambio').checked = false;
         }
+    })
+    .catch(error => {
+        mostrarAlerta('alertaPassword', 'danger', 'Error de conexión. Intente nuevamente.');
     });
 });
 
 function mostrarAlerta(id, tipo, mensaje) {
-    document.getElementById(id).innerHTML = `
+    const alertaDiv = document.getElementById(id);
+    alertaDiv.innerHTML = `
         <div class="alert alert-${tipo} alert-dismissible fade show">
             ${mensaje}
             <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
         </div>
     `;
+    
+    // Auto-cerrar alerta después de 5 segundos
+    setTimeout(() => {
+        const alert = alertaDiv.querySelector('.alert');
+        if (alert) {
+            const bsAlert = new bootstrap.Alert(alert);
+            bsAlert.close();
+        }
+    }, 5000);
 }
+
+// Mostrar/Ocultar contraseñas (opcional)
+document.querySelectorAll('.fa-eye').forEach(icon => {
+    icon.addEventListener('click', function() {
+        const input = this.previousElementSibling;
+        if (input.type === 'password') {
+            input.type = 'text';
+            this.classList.replace('fa-eye', 'fa-eye-slash');
+        } else {
+            input.type = 'password';
+            this.classList.replace('fa-eye-slash', 'fa-eye');
+        }
+    });
+});
 </script>
 </body>
 </html>

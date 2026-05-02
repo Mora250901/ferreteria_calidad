@@ -91,6 +91,8 @@ if ($categoria_id > 0) {
 
 <?php include("../includes/footer.php"); ?>
 
+<link rel="stylesheet" href="../assets/chatbot/chatbot.css">
+<script src="../assets/chatbot/chatbot.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

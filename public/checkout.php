@@ -246,6 +246,7 @@ function actualizarDatos(lat, lng, direccion) {
         "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(direccion);
 }
 </script>
-
+<link rel="stylesheet" href="../assets/chatbot/chatbot.css">
+<script src="../assets/chatbot/chatbot.js"></script>
 </body>
 </html>

@@ -1359,5 +1359,7 @@ document.querySelectorAll('.nav-tabs .nav-link').forEach(tab => {
     });
 });
 </script>
+<link rel="stylesheet" href="../assets/chatbot/chatbot.css">
+<script src="../assets/chatbot/chatbot.js"></script>
 </body>
 </html>
