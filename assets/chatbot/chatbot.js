@@ -38,6 +38,7 @@ class ChatbotUI {
         this.container.innerHTML = `
             <div class="chatbot-header">
                 <h3>Asistente Virtual</h3>
+                <button class="chatbot-clear" title="Nueva conversación" aria-label="Limpiar chat">🔄</button>
                 <button class="chatbot-close" aria-label="Cerrar chat">✕</button>
             </div>
             <div class="chatbot-messages" id="chatbot-messages">
@@ -64,6 +65,7 @@ class ChatbotUI {
     bindEvents() {
         this.toggleBtn.addEventListener('click', () => this.toggleChat());
         this.container.querySelector('.chatbot-close').addEventListener('click', () => this.toggleChat());
+        this.container.querySelector('.chatbot-clear').addEventListener('click', () => this.clearChat());
         this.sendBtn.addEventListener('click', () => this.sendMessage());
         this.input.addEventListener('keypress', (e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
@@ -154,6 +156,17 @@ class ChatbotUI {
     
     scrollToBottom() {
         this.messagesContainer.scrollTop = this.messagesContainer.scrollHeight;
+    }
+
+    async clearChat() {
+        const response = await fetch('../includes/chatbot_handler.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'clear' })
+        });
+        const data = await response.json();
+        this.messagesContainer.innerHTML = '';
+        this.addMessage(data.reply, 'bot');
     }
 }
 

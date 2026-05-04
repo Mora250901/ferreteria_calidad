@@ -13,6 +13,21 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 
 $input   = json_decode(file_get_contents('php://input'), true);
 $message = trim($input['message'] ?? '');
+$action  = $input['action'] ?? 'message';
+
+if ($action === 'clear') {
+    $rol        = 'cliente';
+    $id_usuario = null;
+    if (isset($_SESSION['autenticado']) && $_SESSION['autenticado'] === true) {
+        $rol_sesion = $_SESSION['usuario_data']['rol'] ?? 'cliente';
+        if (in_array($rol_sesion, ['admin', 'logistico'])) $rol = $rol_sesion;
+        $id_usuario = $_SESSION['usuario_data']['id_usuario'] ?? null;
+    }
+    $chatbot = new GroqChatbot($conn, $rol, $id_usuario);
+    $chatbot->clearHistory();
+    echo json_encode(['success' => true, 'reply' => '🔄 Conversación reiniciada. ¿En qué puedo ayudarte?']);
+    exit;
+}
 
 if (empty($message)) {
     http_response_code(400);
@@ -20,16 +35,17 @@ if (empty($message)) {
     exit;
 }
 
-$rol = 'cliente';
+$rol        = 'cliente';
+$id_usuario = null;
+
 if (isset($_SESSION['autenticado']) && $_SESSION['autenticado'] === true) {
     $rol_sesion = $_SESSION['usuario_data']['rol'] ?? 'cliente';
-    if (in_array($rol_sesion, ['admin', 'logistico'])) {
-        $rol = $rol_sesion;
-    }
+    if (in_array($rol_sesion, ['admin', 'logistico'])) $rol = $rol_sesion;
+    $id_usuario = $_SESSION['usuario_data']['id_usuario'] ?? null;
 }
 
 try {
-    $chatbot   = new GroqChatbot($conn, $rol);
+    $chatbot   = new GroqChatbot($conn, $rol, $id_usuario);
     $respuesta = $chatbot->sendMessage($message);
     echo json_encode(['success' => true, 'reply' => $respuesta, 'rol' => $rol]);
 } catch (Exception $e) {
