@@ -677,7 +677,7 @@ $stock_status = $stock <= 0 ? 'out' : ($stock <= 5 ? 'low' : 'ok');
 </head>
 <body>
     
-<?php include '../includes/navgar.php'; ?>
+<?php include '../core/navgar.php'; ?>
 
 <!-- Breadcrumb -->
 <nav aria-label="breadcrumb" class="breadcrumb-section">
@@ -1152,7 +1152,7 @@ $stock_status = $stock <= 0 ? 'out' : ($stock <= 5 ? 'low' : 'ok');
     </div>
 </section>
 
-<?php include('../includes/footer.php'); ?>
+<?php include('../core/footer.php'); ?>
 
 <!-- Cerrar conexiones -->
 <?php

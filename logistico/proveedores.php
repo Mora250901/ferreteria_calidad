@@ -295,7 +295,7 @@ body.oscuro .codebox{ background:#1f2327; }
 </button>
 
 <!-- Sidebar -->
-<?php include("../includes/sidevar.php"); ?>
+<?php include("../core/sidevar.php"); ?>
 
 <div class="main-content">
 <div class="container my-4">

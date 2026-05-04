@@ -276,7 +276,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 <body>
 
 <div class="d-flex">
-    <?php include("../includes/sidebar_admin.php"); ?>
+    <?php include("../core/sidebar_admin.php"); ?>
     
     <div class="main-content flex-grow-1">
         <h2 class="mb-4"><i class="fas fa-id-card-alt me-2"></i> Mi Perfil de Administrador</h2>
@@ -490,7 +490,7 @@ document.getElementById('formPassword').addEventListener('submit', function(e) {
     btnGuardar.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i> Guardando...';
 
     // Enviar datos mediante Fetch API al endpoint dedicado
-    fetch('../config/perfil_ajax.php', {
+    fetch('../api/shared/perfil_ajax.php', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: new URLSearchParams({

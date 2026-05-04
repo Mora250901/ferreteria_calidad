@@ -214,7 +214,7 @@ body.oscuro .ingreso-item { border-bottom-color: #3a3f44; }
     <i class="fas fa-bars"></i>
 </button>
 
-<?php include("../includes/sidevar.php"); ?>
+<?php include("../core/sidevar.php"); ?>
 
 <div class="main-content">
 
@@ -421,7 +421,7 @@ body.oscuro .ingreso-item { border-bottom-color: #3a3f44; }
             <?php endif; ?>
         </div>
         <div class="section-body">
-            <form action="admin_guardar_pagos.php" method="POST">
+            <form action="../api/logistico/admin_guardar_pagos.php" method="POST">
                 <div class="table-responsive">
                     <table id="tablaPendientes" class="table table-hover align-middle mb-0">
                         <thead class="table-light">

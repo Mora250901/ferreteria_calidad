@@ -246,7 +246,7 @@ if (isset($conn) && $conn->ping()) {
 <body>
 
 <div class="d-flex">
-    <?php include("../includes/sidebar_admin.php"); ?>
+    <?php include("../core/sidebar_admin.php"); ?>
     
     <div class="main-content flex-grow-1">
         <h1 class="display-6 fw-bold text-dark mb-4">Gestión de Usuarios Administradores</h1>

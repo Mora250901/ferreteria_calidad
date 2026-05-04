@@ -153,7 +153,7 @@ body.oscuro .card{ background:#2c3034; color:#f8f9fa; }
 </button>
 
 <div class="d-flex">
-  <?php include("../includes/sidevar.php"); ?>
+  <?php include("../core/sidevar.php"); ?>
   <div class="main-content w-100">
     <div class="container py-4">
         <h2 class="mb-4">Compras a Proveedores</h2>

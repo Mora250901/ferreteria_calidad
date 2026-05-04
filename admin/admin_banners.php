@@ -67,7 +67,7 @@ if ($res) while ($b = $res->fetch_assoc()) $banners[] = $b;
 </head>
 <body>
 <div class="d-flex">
-    <?php include("../includes/sidebar_admin.php"); ?>
+    <?php include("../core/sidebar_admin.php"); ?>
 
     <div class="main-content flex-grow-1">
         <h2 class="mb-4">🖼️ Gestión de Banners</h2>

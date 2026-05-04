@@ -37,7 +37,7 @@ if ($categoria_id > 0) {
 </head>
 <body>
 
-<?php include("../includes/navgar.php"); ?> <!-- tu nav dinámico -->
+<?php include("../core/navgar.php"); ?> <!-- tu nav dinámico -->
 
 <div class="container mt-5">
     <h2 class="mb-4 text-center">
@@ -89,7 +89,7 @@ if ($categoria_id > 0) {
     </div>
 </div>
 
-<?php include("../includes/footer.php"); ?>
+<?php include("../core/footer.php"); ?>
 
 <link rel="stylesheet" href="../assets/chatbot/chatbot.css">
 <script src="../assets/chatbot/chatbot.js"></script>

@@ -244,7 +244,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $admin_data) {
 <body>
 
 <div class="d-flex">
-    <?php include("../includes/sidebar_admin.php"); ?>
+    <?php include("../core/sidebar_admin.php"); ?>
     
     <div class="main-content flex-grow-1">
         <h1 class="display-6 fw-bold text-dark mb-4">Editar Cuenta de Administrador</h1>

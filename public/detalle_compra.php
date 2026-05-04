@@ -438,7 +438,7 @@ $estado = strtolower($pedido['estado']);
 </head>
 <body>
 
-<?php include __DIR__ . '/../includes/navgar.php'; ?>
+<?php include __DIR__ . '/../core/navgar.php'; ?>
 
 <div class="order-header-section">
     <div class="container">
@@ -640,7 +640,7 @@ $estado = strtolower($pedido['estado']);
     </div>
 </div>
 
-<?php include __DIR__ . '/../includes/footer.php'; ?>
+<?php include __DIR__ . '/../core/footer.php'; ?>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

@@ -121,6 +121,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                     $insCat->close();
                 }
                 $stCheck->close();
+
+                // 5) Crear o actualizar producto en tienda automáticamente
+                $sqlCheckProd = "SELECT id_producto FROM productos WHERE nombre_producto = ? AND id_categoria = ? LIMIT 1";
+                $stProd = $conn->prepare($sqlCheckProd);
+                $stProd->bind_param("si", $nombre_producto, $id_categoria);
+                $stProd->execute();
+                $resProd = $stProd->get_result();
+
+                if ($rowProd = $resProd->fetch_assoc()) {
+                    // Producto existe → sumar stock
+                    $id_prod_existente = (int)$rowProd['id_producto'];
+                    $conn->query("UPDATE productos SET stock = stock + $cantidad WHERE id_producto = $id_prod_existente");
+                } else {
+                    // Producto no existe → crearlo automáticamente
+                    $precio_venta_sugerido = round($precio_compra * 1.30, 2);
+                    $sqlCrearProd = "INSERT INTO productos (nombre_producto, descripcion, precio, stock, id_categoria, activo, imagen_principal)
+                                     VALUES (?, 'Descripción pendiente - completar en Productos', ?, ?, ?, 1, NULL)";
+                    $stCrearProd = $conn->prepare($sqlCrearProd);
+                    $stCrearProd->bind_param("sdii", $nombre_producto, $precio_venta_sugerido, $cantidad, $id_categoria);
+                    $stCrearProd->execute();
+                    $id_nuevo_producto = $conn->insert_id;
+                    $stCrearProd->close();
+
+                    // Vincular con proveedor
+                    $stProv2 = $conn->prepare("INSERT INTO producto_proveedor (id_producto, id_proveedor, precio_compra) VALUES (?, ?, ?)");
+                    $stProv2->bind_param("iid", $id_nuevo_producto, $id_proveedor, $precio_compra);
+                    $stProv2->execute();
+                    $stProv2->close();
+                }
+                $stProd->close();
             }
         }
 
@@ -205,7 +235,7 @@ body.oscuro .atributo-multiple { background: #2c3034; border-color: #495057; }
 
 <div class="d-flex">
     <!-- Sidebar -->
-    <?php include("../includes/sidevar.php"); ?>
+    <?php include("../core/sidevar.php"); ?>
 
     <!-- Contenido principal -->
     <div class="main-content w-100">
@@ -603,7 +633,7 @@ $(document).ready(function(){
 
         $('#categoriasContainer').html('<div class="text-center"><div class="spinner-border spinner-border-sm" role="status"></div> Cargando categorías...</div>');
 
-        $.getJSON('obtener_categorias_proveedores.php', { 
+        $.getJSON('../api/logistico/obtener_categorias_proveedores.php', { 
             proveedores: proveedoresSeleccionados 
         }, function(response){
             if(response.status === 'ok') {
@@ -830,7 +860,7 @@ $(document).ready(function(){
 
         $('#atributosContainer').html('<div class="text-center"><div class="spinner-border spinner-border-sm" role="status"></div> Cargando atributos...</div>');
 
-        $.getJSON('obtener_atributos_categoria.php', { 
+        $.getJSON('../api/logistico/obtener_atributos_categoria.php', { 
             categoria_id: categoriaId 
         }, function(response){
             if(response.status === 'ok') {
@@ -1210,7 +1240,7 @@ $('.btn-ver-ingreso').on('click', function(){
     // Mostrar loading
     $btn.html('<span class="spinner-border spinner-border-sm" role="status"></span> Cargando...').prop('disabled', true);
     
-    $.getJSON('obtener_detalle_ingreso.php', { 
+    $.getJSON('../api/logistico/obtener_detalle_ingreso.php', { 
         id_ingreso: idIngreso 
     }, function(response){
         if(response.status === 'ok') {

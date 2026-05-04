@@ -125,7 +125,7 @@ if (!empty($search)) {
 <body>
 
 <div class="d-flex">
-    <?php include("../includes/sidebar_admin.php"); ?>
+    <?php include("../core/sidebar_admin.php"); ?>
 
     <div class="main-content flex-grow-1">
         <h2 class="mb-4">Gestión de Usuarios Logístico</h2>

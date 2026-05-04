@@ -427,7 +427,7 @@ $stmt_stats->close();
 </head>
 <body>
 
-<?php include __DIR__ . '/../includes/navgar.php'; ?>
+<?php include __DIR__ . '/../core/navgar.php'; ?>
 
 <!-- Page Header -->
 <div class="page-header">
@@ -647,7 +647,7 @@ $stmt_stats->close();
     <?php endif; ?>
 </div>
 
-<?php include __DIR__ . '/../includes/footer.php'; ?>
+<?php include __DIR__ . '/../core/footer.php'; ?>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>

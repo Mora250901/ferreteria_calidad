@@ -457,7 +457,7 @@ $conn->close();
 <body>
 
 <div class="d-flex">
-    <?php include("../includes/sidebar_admin.php"); ?>
+    <?php include("../core/sidebar_admin.php"); ?>
     
     <div class="main-content flex-grow-1">
         <h2 class="mb-4 text-dark"><i class="fas fa-chart-line me-2 text-primary"></i> Reportes y Dashboards de Ventas</h2>

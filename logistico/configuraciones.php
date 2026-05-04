@@ -146,7 +146,7 @@ body.oscuro .card {
 </button>
 
 <!-- Sidebar -->
-<?php include("../includes/sidevar.php"); ?>
+<?php include("../core/sidevar.php"); ?>
 
 <!-- Contenido principal -->
 <div class="main-content">

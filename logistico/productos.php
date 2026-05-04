@@ -494,18 +494,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     }
 
     if ($_POST['action'] === 'eliminar_imagen_adicional' && isset($_POST['id_imagen'])) {
-      $id_imagen = (int)$_POST['id_imagen'];
-      $res = $conn->query("SELECT ruta FROM producto_imagenes WHERE id_imagen = $id_imagen");
-      if ($row = $res->fetch_assoc()) {
-          $ruta = dirname(__DIR__) . '/' . $row['ruta'];
-          if (file_exists($ruta)) unlink($ruta);
-          $conn->query("DELETE FROM producto_imagenes WHERE id_imagen = $id_imagen");
-          echo json_encode(['status' => 'ok']);
-      } else {
-          echo json_encode(['status' => 'error', 'message' => 'Imagen no encontrada']);
-      }
-      exit;
-  }
+        $id_imagen = (int)$_POST['id_imagen'];
+        $res = $conn->query("SELECT ruta FROM producto_imagenes WHERE id_imagen = $id_imagen");
+        if ($row = $res->fetch_assoc()) {
+            $ruta = dirname(__DIR__) . '/' . $row['ruta'];
+            if (file_exists($ruta)) unlink($ruta);
+            $conn->query("DELETE FROM producto_imagenes WHERE id_imagen = $id_imagen");
+            echo json_encode(['status' => 'ok']);
+        } else {
+            echo json_encode(['status' => 'error', 'message' => 'Imagen no encontrada']);
+        }
+        exit;
+    }
+    
+        if ($_POST['action'] === 'get_imagenes_adicionales' && isset($_POST['id'])) {
+        $id = (int)$_POST['id'];
+        $res = $conn->query("SELECT id_imagen, ruta FROM producto_imagenes WHERE id_producto = $id AND es_principal = 0 ORDER BY orden ASC");
+        $imagenes = [];
+        if ($res) while ($r = $res->fetch_assoc()) $imagenes[] = $r;
+        echo json_encode(['status' => 'ok', 'imagenes' => $imagenes]);
+        exit;
+    }
 
     echo json_encode(['status'=>'error','message'=>'Acción inválida']);
     exit;
@@ -562,7 +571,7 @@ body.oscuro .paso-header { background: #343a40; }
   <i class="fas fa-bars"></i>
 </button>
 
-<?php include("../includes/sidevar.php"); ?>
+<?php include("../core/sidevar.php"); ?>
 
 <div class="main-content">
 <div class="container my-4">

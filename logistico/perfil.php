@@ -100,7 +100,7 @@ body.oscuro .card {
 </button>
 
 <!-- Sidebar -->
-<?php include("../includes/sidevar.php"); ?>
+<?php include("../core/sidevar.php"); ?>
 
 <!-- Contenido principal -->
 <div class="main-content">
@@ -204,7 +204,7 @@ document.getElementById('formPassword').addEventListener('submit', function(e) {
     }
 
     // Enviar datos al servidor
-    fetch('../config/perfil_ajax.php', {
+    fetch('../api/shared/perfil_ajax.php', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: new URLSearchParams({

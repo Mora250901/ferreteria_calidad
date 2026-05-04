@@ -277,7 +277,7 @@ if (!$filtro_activo) {
 <body>
 
 <div class="d-flex">
-    <?php include("../includes/sidebar_admin.php"); ?>
+    <?php include("../core/sidebar_admin.php"); ?>
 
     <div class="main-content flex-grow-1">
         
