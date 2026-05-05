@@ -429,6 +429,13 @@ $stmt_stats->close();
 
 <?php include __DIR__ . '/../core/navgar.php'; ?>
 
+<?php if (isset($_SESSION['msg_devolucion'])): ?>
+    <div class="alert alert-info alert-dismissible fade show m-3">
+        <?= htmlspecialchars($_SESSION['msg_devolucion']); unset($_SESSION['msg_devolucion']); ?>
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+<?php endif; ?>
+
 <!-- Page Header -->
 <div class="page-header">
     <div class="container">
@@ -620,7 +627,16 @@ $stmt_stats->close();
                 </div>
             </div>
 
-            <div class="text-end mt-3">
+            <div class="d-flex justify-content-between align-items-center mt-3">
+                <?php if ($p['estado'] === 'completado' || $p['estado'] === 'entregado'): ?>
+                    <button class="btn btn-outline-warning btn-sm btn-solicitar-devolucion"
+                        data-id="<?= $p['id_pedido'] ?>"
+                        data-total="<?= $p['total'] ?>">
+                        <i class="bi bi-arrow-return-left me-1"></i> Solicitar devolución
+                    </button>
+                <?php else: ?>
+                    <div></div>
+                <?php endif; ?>
                 <a href="detalle_compra.php?id=<?= $p['id_pedido'] ?>" class="btn-view-details">
                     Ver detalles completos
                     <i class="bi bi-arrow-right"></i>
@@ -670,6 +686,14 @@ document.addEventListener('DOMContentLoaded', function() {
             card.style.opacity = '1';
             card.style.transform = 'translateY(0)';
         }, index * 100);
+    });
+});
+
+document.querySelectorAll('.btn-solicitar-devolucion').forEach(btn => {
+    btn.addEventListener('click', function() {
+        document.getElementById('dev_id_pedido').value = this.dataset.id;
+        document.getElementById('dev_monto').value = this.dataset.total;
+        new bootstrap.Modal(document.getElementById('modalDevolucion')).show();
     });
 });
 </script>

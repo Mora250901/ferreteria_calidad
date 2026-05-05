@@ -35,7 +35,10 @@
     <a href="configuraciones.php"><i class="fas fa-cog me-2"></i>Configuraciones</a>
     <a href="productos.php"><i class="fas fa-box me-2"></i>Productos</a>
     <a href="proveedores.php"><i class="fas fa-truck me-2"></i>Proveedores</a>
-    <a href="catalogo_inventario.php"><i class="fas fa-list me-2"></i>Catálogo / Inventario</a>
+    <a href="catalogo_inventario.php"><i class="fas fa-list me-2"></i>Ingresos</a>
+    <a href="historial_inventario.php"><i class="fas fa-history me-2"></i>Historial</a>
+    <a href="devoluciones.php"><i class="fas fa-undo me-2"></i>Devoluciones</a>
+    <a href="almacenes.php"><i class="fas fa-warehouse me-2"></i>Almacenes</a>
     
     <a href="../public/logout.php" class="text-danger"><i class="fas fa-sign-out-alt me-2"></i>Cerrar sesión</a>
     <!-- CHATBOT -->

@@ -211,10 +211,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
          
         $conn->begin_transaction();
         try {
-            $sql = "INSERT INTO productos (nombre_producto, descripcion, precio, stock, sku, id_categoria, activo, imagen_principal)
-                    VALUES (?, '', ?, ?, ?, ?, ?, ?)";
+            $id_marca = !empty($_POST['id_marca']) ? (int)$_POST['id_marca'] : null;
+
+            $sql = "INSERT INTO productos (nombre_producto, descripcion, precio, stock, sku, id_categoria, id_marca, activo, imagen_principal)
+                    VALUES (?, '', ?, ?, ?, ?, ?, ?, ?)";
             $st = $conn->prepare($sql);
-            $st->bind_param("sdisiis", $nombre, $precio, $stock, $sku, $id_categoria, $activo, $rutaDB);
+            $st->bind_param("sdisiiss", $nombre, $precio, $stock, $sku, $id_categoria, $id_marca, $activo, $rutaDB);
             $st->execute();
             $id_producto = $conn->insert_id;
             
@@ -470,11 +472,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
           $stImg->close();
       }
 
+        $id_marca = !empty($_POST['id_marca']) ? (int)$_POST['id_marca'] : null;
+
         $sql = "UPDATE productos 
-                SET nombre_producto=?, descripcion=?, precio=?, sku=?, id_categoria=?, activo=?, imagen_principal=?
+                SET nombre_producto=?, descripcion=?, precio=?, sku=?, id_categoria=?, id_marca=?, activo=?, imagen_principal=?
                 WHERE id_producto=?";
         $st = $conn->prepare($sql);
-        $st->bind_param("ssdsiisi", $nombre, $descripcion, $precio, $sku, $id_categoria, $activo, $rutaDB, $id_producto);
+        $st->bind_param("ssdsiiisi", $nombre, $descripcion, $precio, $sku, $id_categoria, $id_marca, $activo, $rutaDB, $id_producto);
         $ok = $st->execute();
 
         echo json_encode([
@@ -523,6 +527,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 $categorias = [];
 if($rc = $conn->query("SELECT id_categoria, nombre_categoria FROM categorias ORDER BY nombre_categoria ASC")) {
     while($r = $rc->fetch_assoc()) $categorias[] = $r;
+}
+
+$marcas = [];
+if($rm = $conn->query("SELECT id_marca, nombre FROM marcas WHERE activo = 1 ORDER BY nombre ASC")) {
+    while($r = $rm->fetch_assoc()) $marcas[] = $r;
 }
 ?>
 <!doctype html>
@@ -612,6 +621,7 @@ body.oscuro .paso-header { background: #343a40; }
 
 </div>
 </div>
+
 <div class="modal fade" id="modalCrear" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-lg modal-dialog-scrollable">
     <div class="modal-content">
@@ -723,6 +733,15 @@ body.oscuro .paso-header { background: #343a40; }
                 <input type="text" name="sku" class="form-control" placeholder="Código único del producto">
               </div>
               <div class="col-md-6">
+                  <label class="form-label">Marca</label>
+                  <select name="id_marca" class="form-select">
+                      <option value="">Sin marca</option>
+                      <?php foreach($marcas as $m): ?>
+                          <option value="<?= $m['id_marca'] ?>"><?= htmlspecialchars($m['nombre']) ?></option>
+                      <?php endforeach; ?>
+                  </select>
+              </div>
+              <div class="col-md-6">
                   <label class="form-label">Imagen principal</label>
                   <input type="file" name="imagen_principal" class="form-control" accept="image/*">
               </div>
@@ -793,6 +812,15 @@ body.oscuro .paso-header { background: #343a40; }
             <div class="col-md-4">
               <label class="form-label">SKU</label>
               <input type="text" name="sku" id="edit_sku" class="form-control">
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Marca</label>
+                <select name="id_marca" id="edit_marca" class="form-select">
+                    <option value="">Sin marca</option>
+                    <?php foreach($marcas as $m): ?>
+                        <option value="<?= $m['id_marca'] ?>"><?= htmlspecialchars($m['nombre']) ?></option>
+                    <?php endforeach; ?>
+                </select>
             </div>
             <div class="col-md-6">
               <label class="form-label">Categoría *</label>
@@ -1224,6 +1252,7 @@ $(document).on('click', '.btn-editar', function() {
         $('#edit_precio').val(p.precio);
         $('#edit_stock').val(p.stock);
         $('#edit_sku').val(p.sku);
+        $('#edit_marca').val(p.id_marca || '');
         $('#edit_categoria').val(p.id_categoria);
         $('#edit_desc').val(p.descripcion);
         $('#edit_activo').prop('checked', p.activo == 1);
